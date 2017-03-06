@@ -46,6 +46,7 @@
     "lodash": "^4.17.4",
     "multiaddr": "^2.2.1",
     "multistream-select": "^0.13.4",
+    "pull-abortable": "^4.1.0",
     "pull-handshake": "^1.1.4",
     "pull-stream": "^3.5.0"
   }

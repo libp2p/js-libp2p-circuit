@@ -4,7 +4,6 @@
 const Node = require('libp2p-ipfs-nodejs')
 const PeerInfo = require('peer-info')
 const series = require('async/series')
-const parallel = require('async/parallel')
 const pull = require('pull-stream')
 
 const Relay = require('../src').Relay
@@ -13,7 +12,7 @@ const Listener = require('../src').Listener
 
 const expect = require('chai').expect
 
-describe(`test circuit`, () => {
+describe(`test circuit`, function () {
   let srcNode
   let dstNode
   let relayNode
@@ -28,6 +27,8 @@ describe(`test circuit`, () => {
 
   let portBase = 9000 // TODO: randomize or mock sockets
   before((done) => {
+    this.timeout(50000)
+
     series([
       (cb) => {
         PeerInfo.create((err, info) => {
@@ -52,76 +53,113 @@ describe(`test circuit`, () => {
           relayNode = new Node(relayPeer)
           cb(err)
         })
-      },
-      (cb) => {
-        let relays = new Map()
-        relays.set(relayPeer.id.toB58String(), relayPeer)
-        dialer = new Dialer(srcNode, relays)
-        cb()
-      },
-      (cb) => {
-        relayCircuit = new Relay(relayNode)
-        relayCircuit.start(cb)
       }],
       (err) => done(err)
     )
   })
 
-  beforeEach((done) => {
-    parallel([
-      (cb) => {
-        srcNode.start(cb)
-      },
-      (cb) => {
-        dstNode.start(cb)
-      },
-      (cb) => {
-        relayNode.start(cb)
-      }
-    ], (err) => done(err))
-  })
-
-  afterEach((done) => {
-    parallel([
-      (cb) => {
-        srcNode.stop(cb)
-      },
-      (cb) => {
-        dstNode.stop(cb)
-      },
-      (cb) => {
-        relayNode.stop(cb)
-      }
-    ], (err) => done(err))
-  })
-
-  it(`should connect to relay peer`, (done) => {
-    listener = new Listener(dstNode, (conn) => {
-      pull(
-        conn,
-        pull.map((data) => {
-          return data.toString().split('').reverse().join('')
-        }),
-        conn
-      )
+  describe(`simple circuit tests`, function circuitTests () {
+    beforeEach(function (done) {
+      series([
+        (cb) => {
+          srcNode.start(cb)
+        },
+        (cb) => {
+          dstNode.start(cb)
+        },
+        (cb) => {
+          relayNode.start(cb)
+        },
+        (cb) => {
+          let relays = new Map()
+          relays.set(relayPeer.id.toB58String(), relayPeer)
+          dialer = new Dialer(srcNode, relays)
+          cb()
+        },
+        (cb) => {
+          relayCircuit = new Relay(relayNode)
+          relayCircuit.start(cb)
+        }
+      ], (err) => done(err))
     })
 
-    listener.listen(() => {
+    afterEach(function circuitTests (done) {
+      series([
+        (cb) => {
+          srcNode.stop(cb)
+        },
+        (cb) => {
+          dstNode.stop(cb)
+        },
+        (cb) => {
+          relayNode.stop(cb)
+        },
+        (cb) => {
+          relayCircuit.stop()
+          relayCircuit = null
+          dialer = null
+          cb()
+        }
+      ], (err) => done(err))
     })
 
-    dialer.dial(dstPeer, (err, conn) => {
-      if (err) {
-        done(err)
-      }
+    it(`source should be able to write/read to dest over relay`, function (done) {
+      listener = new Listener(dstNode, (conn) => {
+        pull(
+          conn,
+          pull.map((data) => {
+            return data.toString().split('').reverse().join('')
+          }),
+          conn
+        )
+      })
 
-      pull(
-        pull.values(['hello']),
-        conn,
-        pull.collect((err, data) => {
-          expect(data[0].toString()).to.equal('olleh')
+      listener.listen()
+
+      dialer.dial(dstPeer, (err, conn) => {
+        if (err) {
           done(err)
-        })
-      )
+        }
+
+        pull(
+          pull.values(['hello']),
+          conn,
+          pull.collect((err, data) => {
+            expect(data[0].toString()).to.equal('olleh')
+            listener.close()
+            done(err)
+          })
+        )
+      })
     })
-  }).timeout(50000)
+
+    it(`destination should be able to write/read to source over relay`, function (done) {
+      listener = new Listener(dstNode, (conn) => {
+        pull(
+          pull.values(['hello']),
+          conn,
+          pull.collect((err, data) => {
+            expect(data[0].toString()).to.equal('olleh')
+            listener.close()
+            done(err)
+          })
+        )
+      })
+
+      listener.listen()
+
+      dialer.dial(dstPeer, (err, conn) => {
+        if (err) {
+          done(err)
+        }
+        pull(
+          conn,
+          pull.map((data) => {
+            return data.toString().split('').reverse().join('')
+          }),
+          conn
+        )
+      })
+    })
+  })
 })

@@ -64,7 +64,7 @@ class Listener {
 
       let addr = multiaddr(msg.toString())
       try {
-        PeerInfo.create(addr.peerId(), (err, peerInfo) => {
+        PeerInfo.create(addr.getPeerId(), (err, peerInfo) => {
           if (err) {
             log.err(err)
             return err

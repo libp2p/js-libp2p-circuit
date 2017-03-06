@@ -6,8 +6,9 @@ const multiaddr = require('multiaddr')
 const config = require('./config')
 const Peer = require('./peer')
 const handshake = require('pull-handshake')
-const mss = require('multistream-select')
 const Connection = require('interface-connection').Connection
+const RelaySession = require('./relay-session')
+const utils = require('./utils')
 
 const multicodec = require('./config').multicodec
 
@@ -17,17 +18,20 @@ class Relay {
   constructor (libp2p) {
     this.libp2p = libp2p
     this.peers = new Map()
+    this.relaySessions = new Map()
 
     this._onConnection = this._onConnection.bind(this)
     this._dialPeer = this._dialPeer.bind(this)
   }
 
   start (cb) {
+    cb = cb || function () {}
     this.libp2p.handle(multicodec, this._onConnection)
     cb()
   }
 
   stop (cb) {
+    cb = cb || function () {}
     this.libp2p.unhandle(multicodec)
     cb()
   }
@@ -115,18 +119,14 @@ class Relay {
         return callback(err)
       }
 
-      let srcAddrs = destPeer.peerInfo.distinctMultiaddr()
+      let relaySession = new RelaySession(srcPeer, destPeer)
+      this.relaySessions.set(
+        utils.getCircuitStrAddr(srcPeer.peerInfo, destPeer.peerInfo),
+        relaySession
+      )
 
-      if (!(srcAddrs && srcAddrs.length > 0)) {
-        log.err(`No valid multiaddress for peer!`)
-      }
-
-      let stream = handshake({timeout: 1000 * 60}, callback)
-      let shake = stream.handshake
-
-      mss.util.writeEncoded(shake, `${srcAddrs[0].toString()}/ipfs/${srcPeer.peerInfo.id.toB58String()}`)
-      pull(stream, destPeer.conn, stream)
-      pull(srcPeer.conn, shake.rest(), srcPeer.conn)
+      // create the circuit
+      relaySession.circuit()
     })
   }
 }

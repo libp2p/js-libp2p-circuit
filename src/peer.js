@@ -13,7 +13,6 @@ class Peer {
      * @type {Connection}
      */
     this.conn = conn
-
     /**
      * @type {PeerInfo}
      */
