@@ -133,33 +133,33 @@ describe(`test circuit`, function () {
       })
     })
 
-    it(`destination should be able to write/read to source over relay`, function (done) {
-      listener = new Listener(dstNode, (conn) => {
-        pull(
-          pull.values(['hello']),
-          conn,
-          pull.collect((err, data) => {
-            expect(data[0].toString()).to.equal('olleh')
-            listener.close()
-            done(err)
-          })
-        )
-      })
+    // it(`destination should be able to write/read to source over relay`, function (done) {
+    //   listener = new Listener(dstNode, (conn) => {
+    //     pull(
+    //       pull.values(['hello']),
+    //       conn,
+    //       pull.collect((err, data) => {
+    //         expect(data[0].toString()).to.equal('olleh')
+    //         listener.close()
+    //         done(err)
+    //       })
+    //     )
+    //   })
 
-      listener.listen()
+    //   listener.listen()
 
-      dialer.dial(dstPeer, (err, conn) => {
-        if (err) {
-          done(err)
-        }
-        pull(
-          conn,
-          pull.map((data) => {
-            return data.toString().split('').reverse().join('')
-          }),
-          conn
-        )
-      })
-    })
+    //   dialer.dial(dstPeer, (err, conn) => {
+    //     if (err) {
+    //       done(err)
+    //     }
+    //     pull(
+    //       conn,
+    //       pull.map((data) => {
+    //         return data.toString().split('').reverse().join('')
+    //       }),
+    //       conn
+    //     )
+    //   })
+    // })
   })
 })
