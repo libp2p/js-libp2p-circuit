@@ -1,6 +1,6 @@
 'use strict'
 
-exports.Dialer = require('./transport/dialer')
+exports = module.exports = require('./relay')
+exports.Circuit = require('./transport')
 exports.Listener = require('./transport/listener')
-exports.Peer = require('./peer')
-exports.Relay = require('./relay')
+

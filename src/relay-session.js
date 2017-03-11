@@ -6,12 +6,14 @@ const mss = require('multistream-select')
 const config = require('./config')
 const abortable = require('pull-abortable')
 const utils = require('./utils')
+const Connection = require('interface-connection').Connection
 
 const log = config.log
 
 class RelaySession {
   /**
    * Constructs a relay RelaySession
+   *
    * @param {Peer} src - the source peer
    * @param {Peer} dst - the destination peer
    */
@@ -27,6 +29,7 @@ class RelaySession {
 
   /**
    * is relay active
+   *
    * @returns {Boolean} is stream active
    */
   isActive () {
@@ -35,6 +38,7 @@ class RelaySession {
 
   /**
    * Circuit two connections
+   *
    * @returns {void}
    */
   circuit () {
@@ -60,8 +64,8 @@ class RelaySession {
     // circuit the src and dst streams
     pull(
       this.src.conn,
-      shake.rest(),
       this.stream,
+      shake.rest(),
       this.src.conn
     )
 

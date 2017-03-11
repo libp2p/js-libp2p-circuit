@@ -36,6 +36,11 @@ class Peer {
   get isConnected () {
     return Boolean(this.conn)
   }
+
+  close () {
+    this.conn = null
+    this.peerInfo = null
+  }
 }
 
 module.exports = Peer

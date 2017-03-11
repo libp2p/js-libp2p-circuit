@@ -33,7 +33,17 @@
   "devDependencies": {
     "aegir": "^10.0.0",
     "chai": "^3.5.0",
+    "libp2p-ipfs-browser": "^0.19.0",
     "libp2p-ipfs-nodejs": "^0.19.0",
+    "libp2p-mdns": "^0.6.1",
+    "libp2p-multiplex": "^0.4.1",
+    "libp2p-railing": "^0.4.1",
+    "libp2p-secio": "^0.6.7",
+    "libp2p-spdy": "^0.10.4",
+    "libp2p-swarm": "^0.26.18",
+    "libp2p-tcp": "^0.9.3",
+    "libp2p-webrtc-star": "^0.8.8",
+    "libp2p-websockets": "^0.9.2",
     "peer-id": "^0.8.2",
     "peer-info": "^0.8.3",
     "pre-commit": "^1.2.2"
@@ -48,6 +58,7 @@
     "multistream-select": "^0.13.4",
     "pull-abortable": "^4.1.0",
     "pull-handshake": "^1.1.4",
-    "pull-stream": "^3.5.0"
+    "pull-stream": "^3.5.0",
+    "setimmediate": "^1.0.5"
   }
 }

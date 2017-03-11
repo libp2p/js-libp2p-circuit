@@ -21,7 +21,6 @@ class Relay {
     this.relaySessions = new Map()
 
     this._onConnection = this._onConnection.bind(this)
-    this._dialPeer = this._dialPeer.bind(this)
   }
 
   start (cb) {
@@ -40,7 +39,7 @@ class Relay {
     let idB58Str
 
     try {
-      idB58Str = ma.peerId() // try to get the peerid from the multiaddr
+      idB58Str = ma.getPeerId() // try to get the peerid from the multiaddr
     } catch (err) {
       log.err(err)
     }
@@ -52,7 +51,12 @@ class Relay {
       }
     }
 
-    this.libp2p.dialByMultiaddr(ma, multicodec, (err, conn) => {
+    let addr = ma.toString()
+    if (addr.startsWith('/p2p-circuit')) {
+      addr = addr.substring(String('/p2p-circuit').length)
+    }
+
+    this.libp2p.dialByMultiaddr(multiaddr(addr), multicodec, (err, conn) => {
       if (err) {
         log.err(err)
         return callback(err)
@@ -68,10 +72,11 @@ class Relay {
         // If already had a dial to me, just add the conn
         if (!this.peers.has(idB58Str)) {
           this.peers.set(idB58Str, new Peer(conn, peerInfo))
+        } else {
+          this.peers.get(idB58Str).attachConnection(conn)
         }
 
-        const peer = this.peers.get(idB58Str)
-        callback(null, peer)
+        callback(null, this.peers.get(idB58Str))
       })
     })
   }
@@ -101,15 +106,21 @@ class Relay {
     lp.decodeFromReader(shake, (err, msg) => {
       if (err) {
         log.err(err)
-        return pull(pull.empty(), conn)
+        return
       }
 
       let addr = multiaddr(msg.toString())
-      srcPeer.attachConnection(new Connection(shake.rest(), conn))
-      this._circuit(srcPeer, addr)
+      let newConn = new Connection(shake.rest(), conn)
+      srcPeer.attachConnection(newConn)
+      this._circuit(srcPeer, addr, (err) => {
+        if (err) {
+          log.err(err)
+          return
+        }
+      })
     })
 
-    pull(stream, conn, stream)
+    return pull(stream, conn, stream)
   }
 
   _circuit (srcPeer, ma, callback) {
@@ -127,6 +138,7 @@ class Relay {
 
       // create the circuit
       relaySession.circuit()
+      return callback()
     })
   }
 }

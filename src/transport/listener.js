@@ -5,32 +5,43 @@ const pull = require('pull-stream')
 const multiaddr = require('multiaddr')
 const PeerInfo = require('peer-info')
 const Peer = require('../peer')
-const includes = require('lodash/includes')
 const lp = require('pull-length-prefixed')
 const handshake = require('pull-handshake')
 const Connection = require('interface-connection').Connection
+const EventEmitter = require('events').EventEmitter
+const mss = require('multistream-select')
 
 const multicodec = config.multicodec
 const log = config.log
 
-class Listener {
-  constructor (libp2p, handler) {
-    this.libp2p = libp2p
+class Listener extends EventEmitter {
+  constructor (swarm) {
+    super()
+    this.swarm = swarm
     this.peers = new Map()
-    this.handler = handler
 
     this._onConnection = this._onConnection.bind(this)
   }
 
   listen (cb) {
-    cb = cb || function () {}
-    this.libp2p.handle(multicodec, this._onConnection)
+    cb = cb || (() => {
+    })
+    this.swarm.handle(multicodec, this._onConnection)
+    this.emit('listening')
     cb()
   }
 
-  close (cb) {
-    cb = cb || function () {}
-    this.libp2p.unhandle(multicodec)
+  close (options, cb) {
+    if (typeof options === 'function') {
+      cb = options
+      options = {}
+    }
+    cb = cb || (() => {
+    })
+    options = options || {}
+
+    this.swarm.unhandle(multicodec)
+    this.emit('close')
     cb()
   }
 
@@ -38,6 +49,7 @@ class Listener {
     conn.getPeerInfo((err, peerInfo) => {
       if (err) {
         log.err('Failed to identify incomming conn', err)
+        this.emit('error', err)
         return pull(pull.empty(), conn)
       }
 
@@ -48,18 +60,22 @@ class Listener {
         relayPeer = peerInfo
         this.peers.set(idB58Str, new Peer(conn, peerInfo))
       }
-      this._processConnection(relayPeer, conn)
+      this._processConnection(relayPeer, conn, (err) => {
+        if (err) {
+          log.err(err)
+          this.emit('error', new Error(err))
+        }
+      })
     })
   }
 
-  _processConnection (relayPeer, conn) {
+  _processConnection (relayPeer, conn, cb) {
     let stream = handshake({ timeout: 1000 * 60 })
     let shake = stream.handshake
 
     lp.decodeFromReader(shake, (err, msg) => {
       if (err) {
-        err(err)
-        return err
+        return cb(err)
       }
 
       let addr = multiaddr(msg.toString())
@@ -67,24 +83,26 @@ class Listener {
         PeerInfo.create(addr.getPeerId(), (err, peerInfo) => {
           if (err) {
             log.err(err)
-            return err
+            this.handler(err)
           }
 
-          if (includes(addr.protoNames(), 'ipfs')) {
-            addr = addr.decapsulate('ipfs')
-          }
-
+          mss.util.writeEncoded(shake, 'ok')
           peerInfo.multiaddr.add(addr)
-          this.handler(new Connection(shake.rest(), peerInfo))
+          const conn = new Connection(shake.rest(), peerInfo)
+          this.emit('connection', conn)
         })
       } catch (err) {
-        log.err(err)
+        cb(err)
       }
     })
 
     pull(stream, conn, stream)
   }
-
 }
 
 module.exports = Listener
+module.exports.listener = (swarm) => {
+  const listener = new Listener(swarm)
+  listener.listen()
+  return listener
+}
