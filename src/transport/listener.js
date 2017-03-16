@@ -11,8 +11,12 @@ const Connection = require('interface-connection').Connection
 const EventEmitter = require('events').EventEmitter
 const mss = require('multistream-select')
 
+const debug = require('debug')
+
 const multicodec = config.multicodec
-const log = config.log
+
+const log = debug('libp2p:circuit:listener')
+log.err = debug('libp2p:circuit:error:listener')
 
 class Listener extends EventEmitter {
   constructor (swarm) {
@@ -48,7 +52,7 @@ class Listener extends EventEmitter {
   _onConnection (protocol, conn) {
     conn.getPeerInfo((err, peerInfo) => {
       if (err) {
-        log.err('Failed to identify incomming conn', err)
+        log.err('Failed to identify incoming conn', err)
         this.emit('error', err)
         return pull(pull.empty(), conn)
       }
@@ -70,7 +74,7 @@ class Listener extends EventEmitter {
   }
 
   _processConnection (relayPeer, conn, cb) {
-    let stream = handshake({ timeout: 1000 * 60 })
+    let stream = handshake({timeout: 1000 * 60})
     let shake = stream.handshake
 
     lp.decodeFromReader(shake, (err, msg) => {

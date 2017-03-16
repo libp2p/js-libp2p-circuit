@@ -9,12 +9,13 @@ const Connection = require('interface-connection').Connection
 const mafmt = require('mafmt')
 const PeerInfo = require('peer-info')
 const isFunction = require('lodash.isfunction')
-const EventEmmiter = require('events').EventEmitter
 const multiaddr = require('multiaddr')
-const includes = require('lodash/includes')
 const lp = require('pull-length-prefixed')
 
-const log = config.log
+const debug = require('debug')
+
+const log = debug('libp2p:circuit:dialer')
+log.err = debug('libp2p:circuit:error:dialer')
 
 class Circuit {
   /**
@@ -40,7 +41,7 @@ class Circuit {
    * @param {multiaddr} ma - the multiaddr of the peer to dial
    * @param {Object} options - dial options
    * @param {Function} cb - a callback called once dialed
-   * @returns {void}
+   * @returns {Connection} - the connection
    *
    * @memberOf Dialer
    */
@@ -70,12 +71,14 @@ class Circuit {
         this.peers.get(idB58Str).conn)
     }
 
+    let dstConn = new Connection()
     PeerInfo.create(idB58Str, (err, dstPeer) => {
       if (err) {
         log.err(err)
         cb(err)
       }
 
+      dstConn.setPeerInfo(dstPeer)
       dstPeer.multiaddr.add(ma)
 
       let relays = Array.from(this.relayPeers.values())
@@ -108,7 +111,8 @@ class Circuit {
               }
 
               if (msg.toString() === 'ok') {
-                cb(null, new Connection(shake.rest(), conn))
+                dstConn.setInnerConn(shake.rest())
+                cb(null, dstConn)
               } else {
                 return cb(new Error(`ko`))
               }
@@ -122,18 +126,12 @@ class Circuit {
 
       next(relays.shift())
     })
+
+    return dstConn
   }
 
   createListener (options, handler) {
-    if (isFunction(options)) {
-      handler = options
-      options = {}
-    }
-
-    handler = handler || (() => {
-    })
-
-    return new EventEmmiter()
+    throw new Error(`not implemented`)
   }
 
   /**
@@ -228,7 +226,6 @@ class Circuit {
       return mafmt.Circuit.matches(ma)
     })
   }
-
 }
 
 module.exports = Circuit

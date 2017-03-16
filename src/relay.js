@@ -3,16 +3,17 @@
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const multiaddr = require('multiaddr')
-const config = require('./config')
 const Peer = require('./peer')
 const handshake = require('pull-handshake')
 const Connection = require('interface-connection').Connection
 const RelaySession = require('./relay-session')
 const utils = require('./utils')
+const debug = require('debug')
 
 const multicodec = require('./config').multicodec
 
-const log = config.log
+const log = debug('libp2p:circuit:relay')
+log.err = debug('libp2p:circuit:error:relay')
 
 class Relay {
   constructor (libp2p) {
@@ -36,20 +37,20 @@ class Relay {
   }
 
   _dialPeer (ma, callback) {
-    let idB58Str
+    // let idB58Str
 
-    try {
-      idB58Str = ma.getPeerId() // try to get the peerid from the multiaddr
-    } catch (err) {
-      log.err(err)
-    }
+    // try {
+    //   idB58Str = ma.getPeerId() // try to get the peerid from the multiaddr
+    // } catch (err) {
+    //   log.err(err)
+    // }
 
-    if (idB58Str) {
-      const peer = this.peers.get(idB58Str)
-      if (peer && peer.isConnected()) {
-        return
-      }
-    }
+    // if (idB58Str) {
+    //   const peer = this.peers.get(idB58Str)
+    //   if (peer && peer.isConnected) {
+    //     return callback(null, peer)
+    //   }
+    // }
 
     let addr = ma.toString()
     if (addr.startsWith('/p2p-circuit')) {
@@ -82,9 +83,9 @@ class Relay {
   }
 
   _onConnection (protocol, conn) {
-    conn.getPeerInfo((err, peerInfo) => {
+    setImmediate(() => conn.getPeerInfo((err, peerInfo) => {
       if (err) {
-        log.err('Failed to identify incomming conn', err)
+        log.err('Failed to identify incoming conn', err)
         return pull(pull.empty(), conn)
       }
 
@@ -96,7 +97,7 @@ class Relay {
         this.peers.set(idB58Str, srcPeer)
       }
       this._processConnection(srcPeer, conn)
-    })
+    }))
   }
 
   _processConnection (srcPeer, conn) {
@@ -115,7 +116,7 @@ class Relay {
       this._circuit(srcPeer, addr, (err) => {
         if (err) {
           log.err(err)
-          return
+          return null
         }
       })
     })

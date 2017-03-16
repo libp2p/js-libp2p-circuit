@@ -6,7 +6,6 @@ const mss = require('multistream-select')
 const config = require('./config')
 const abortable = require('pull-abortable')
 const utils = require('./utils')
-const Connection = require('interface-connection').Connection
 
 const log = config.log
 
