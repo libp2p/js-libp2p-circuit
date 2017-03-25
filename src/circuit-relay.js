@@ -2,19 +2,16 @@
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const multiaddr = require('multiaddr')
 const Peer = require('./peer')
 const handshake = require('pull-handshake')
-const utils = require('./utils')
 const debug = require('debug')
-const includes = require('lodash/includes')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 
 const multicodec = require('./multicodec')
 
-const log = debug('libp2p:circuit:circuit')
-log.err = debug('libp2p:circuit:error:circuit')
+const log = debug('libp2p:circuit:relay')
+log.err = debug('libp2p:circuit:error:relay')
 
 class Circuit {
 
@@ -36,11 +33,13 @@ class Circuit {
   }
 
   /**
+   * The handler called to process a connection
    *
-   * @param conn
-   * @param peerInfo
-   * @param dstAddr
-   * @param cb
+   * @param {Connection} conn
+   * @param {Multiaddr} dstAddr
+   * @param {Function} cb
+   *
+   * @return {void}
    */
   handler (conn, dstAddr, cb) {
     this._circuit(conn, dstAddr, cb)
@@ -74,6 +73,15 @@ class Circuit {
     })
   }
 
+  /**
+   * Circuit two peers
+   *
+   * @param {Connection} srcConn
+   * @param {Multiaddr} dstMa
+   * @param {Function} cb
+   * @return {void}
+   * @private
+   */
   _circuit (srcConn, dstMa, cb) {
     this._dialPeer(dstMa, (err, dstConn) => {
       if (err) {
@@ -85,6 +93,11 @@ class Circuit {
       let shake = stream.handshake
 
       dstConn.getPeerInfo((err, peerInfo) => {
+        if (err) {
+          log.err(err)
+          return cb(err)
+        }
+
         pull(
           pull.values([new Buffer(`/ipfs/${peerInfo.id.toB58String()}`)]),
           lp.encode(),
@@ -111,7 +124,6 @@ class Circuit {
         dstConn,
         stream
       )
-      
     })
   }
 }

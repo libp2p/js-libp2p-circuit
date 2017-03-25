@@ -30,6 +30,11 @@
     "url": "https://github.com/libp2p/js-libp2p-circuit/issues"
   },
   "homepage": "https://github.com/libp2p/js-libp2p-circuit#readme",
+  "eslintConfig": {
+    "extends": [
+      "./node_modules/aegir/config/eslintrc.yml"
+    ]
+  },
   "devDependencies": {
     "aegir": "^10.0.0",
     "chai": "^3.5.0",

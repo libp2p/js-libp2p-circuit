@@ -3,7 +3,6 @@
 
 const PeerInfo = require('peer-info')
 const series = require('async/series')
-const parallel = require('async/parallel')
 const pull = require('pull-stream')
 const Libp2p = require('libp2p')
 
@@ -11,7 +10,6 @@ const TCP = require('libp2p-tcp')
 const WS = require('libp2p-websockets')
 const spdy = require('libp2p-spdy')
 const multiplex = require('libp2p-multiplex')
-const waterfall = require('async/waterfall')
 const secio = require('libp2p-secio')
 
 const expect = require('chai').expect
@@ -91,12 +89,8 @@ describe('test relay', function () {
       (cb) => {
         dstNode.start(cb)
       },
-      (cb) => srcNode.dialByPeerInfo(relayPeer, (err, conn) => {
-        cb()
-      }),
-      (cb) => dstNode.dialByPeerInfo(relayPeer, (err, conn) => {
-        cb()
-      })
+      (cb) => srcNode.dialByPeerInfo(relayPeer, cb),
+      (cb) => dstNode.dialByPeerInfo(relayPeer, cb)
     ], done)
 
   }
@@ -112,7 +106,7 @@ describe('test relay', function () {
       (cb) => {
         relayNode.stop(cb)
       }
-    ], (err) => done()) // TODO: pass err to done once we figure out why spdy is throwing on stop
+    ], () => done()) // TODO: pass err to done once we figure out why spdy is throwing on stop
   }
 
   function reverse (protocol, conn) {
@@ -135,7 +129,7 @@ describe('test relay', function () {
         pull.values(['hello']),
         conn,
         pull.collect((err, data) => {
-          if (err) return cb(err)
+          if (err) return done(err)
 
           data.forEach((val, i) => {
             expect(val.toString()).to.equal(vals[i].split('').reverse().join(''))

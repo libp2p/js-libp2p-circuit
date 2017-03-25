@@ -2,14 +2,13 @@
 
 const includes = require('lodash/includes')
 const pull = require('pull-stream')
-const Circuit = require('./circuit')
+const Circuit = require('./circuit-relay')
 const multicodec = require('./multicodec')
 const EE = require('events').EventEmitter
 const lp = require('pull-length-prefixed')
 const multiaddr = require('multiaddr')
 const handshake = require('pull-handshake')
 const Connection = require('interface-connection').Connection
-const abortable = require('pull-abortable')
 
 const debug = require('debug')
 
@@ -76,7 +75,7 @@ module.exports = (swarm, handler) => {
 
   listener.close = (cb) => {
     // TODO: should we close/abort connections here?
-    // spdy-transport throw a `Error: socket hang up`
+    // spdy-transport throws a `Error: socket hang up`
     // on swarm stop right now, could be an existing issue?
     swarm.unhandle(multicodec)
     listener.emit('close')

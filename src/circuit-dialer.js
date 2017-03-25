@@ -130,15 +130,13 @@ class CircuitDialer {
   }
 
   /**
-   * Create listener
+   * Create a listener
    *
+   * @param {Function} handler
    * @param {any} options
-   * @param {any} handler
-   * @returns {Listener}
-   *
-   * @memberOf CircuitDialer
+   * @returns {listener}
    */
-  createListener (handler) {
+  createListener (handler, options) {
     return createListener(this.swarm, handler)
   }
 
