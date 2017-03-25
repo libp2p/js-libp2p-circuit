@@ -92,7 +92,6 @@ describe('test relay', function () {
       (cb) => srcNode.dialByPeerInfo(relayPeer, cb),
       (cb) => dstNode.dialByPeerInfo(relayPeer, cb)
     ], done)
-
   }
 
   function stopNodes (done) {
@@ -156,7 +155,6 @@ describe('test relay', function () {
     it('should dial to a node over a relay and write several values', function (done) {
       dialAndRevers(['hello', 'hello1', 'hello2', 'hello3'], done)
     })
-
   })
 
   describe(`circuit over multiplex muxer`, function () {
@@ -175,6 +173,5 @@ describe('test relay', function () {
     it('should dial to a node over a relay and write several values', function (done) {
       dialAndRevers(['hello', 'hello1', 'hello2', 'hello3'], done)
     })
-
   })
 })
