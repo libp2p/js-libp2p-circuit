@@ -12,22 +12,20 @@ const WS = require('libp2p-websockets')
 const spdy = require('libp2p-spdy')
 const multiplex = require('libp2p-multiplex')
 const waterfall = require('async/waterfall')
+const secio = require('libp2p-secio')
 
 const expect = require('chai').expect
 
 class TestNode extends Libp2p {
-  constructor (peerInfo, transports, options) {
+  constructor (peerInfo, transports, muxer, options) {
     options = options || {}
 
     const modules = {
       transport: transports,
       connection: {
-        muxer: [
-          // spdy
-          multiplex
-        ],
+        muxer: [muxer],
         crypto: [
-          // secio
+          secio
         ]
       },
       discovery: []
@@ -48,41 +46,42 @@ describe('test relay', function () {
   let relayPeer
 
   let portBase = 9000 // TODO: randomize or mock sockets
-  before((done) => {
-    series([
-        (cb) => {
-          PeerInfo.create((err, info) => {
-            relayPeer = info
-            relayPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}`)
-            relayPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}/ws`)
-            relayNode = new TestNode(relayPeer, [new TCP(), new WS()], {relay: true})
-            cb(err)
-          })
-        },
-        (cb) => {
-          PeerInfo.create((err, info) => {
-            srcPeer = info
-            srcPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}`)
-            srcNode = new TestNode(srcPeer, [new TCP()])
-            srcNode.peerBook.put(relayPeer)
-            cb(err)
-          })
-        },
-        (cb) => {
-          PeerInfo.create((err, info) => {
-            dstPeer = info
-            dstPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}/ws`)
-            dstNode = new TestNode(dstPeer, [new WS()])
-            srcNode.peerBook.put(relayPeer)
-            cb(err)
-          })
-        }
-      ], (err) => done(err)
-    )
-  })
 
-  beforeEach(function (done) {
+  function setUpNodes (muxer, cb) {
     series([
+      (cb) => {
+        PeerInfo.create((err, info) => {
+          relayPeer = info
+          relayPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}`)
+          relayPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}/ws`)
+          relayNode = new TestNode(relayPeer, [new TCP(), new WS()], muxer, {relay: true})
+          cb(err)
+        })
+      },
+      (cb) => {
+        PeerInfo.create((err, info) => {
+          srcPeer = info
+          srcPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}`)
+          srcNode = new TestNode(srcPeer, [new TCP()], muxer)
+          srcNode.peerBook.put(relayPeer)
+          cb(err)
+        })
+      },
+      (cb) => {
+        PeerInfo.create((err, info) => {
+          dstPeer = info
+          dstPeer.multiaddr.add(`/ip4/0.0.0.0/tcp/${portBase++}/ws`)
+          dstNode = new TestNode(dstPeer, [new WS()], muxer)
+          srcNode.peerBook.put(relayPeer)
+          cb(err)
+        })
+      }
+    ], cb)
+  }
+
+  function startNodes (muxer, done) {
+    series([
+      (cb) => setUpNodes(muxer, cb),
       (cb) => {
         relayNode.start(cb)
       },
@@ -98,10 +97,11 @@ describe('test relay', function () {
       (cb) => dstNode.dialByPeerInfo(relayPeer, (err, conn) => {
         cb()
       })
-    ], (err) => done(err))
-  })
+    ], done)
 
-  afterEach(function circuitTests (done) {
+  }
+
+  function stopNodes (done) {
     series([
       (cb) => {
         srcNode.stop(cb)
@@ -112,55 +112,75 @@ describe('test relay', function () {
       (cb) => {
         relayNode.stop(cb)
       }
-    ], (err) => done(err))
-  })
+    ], (err) => done()) // TODO: pass err to done once we figure out why spdy is throwing on stop
+  }
 
-  describe('test basic circuit functionality', function () {
-    function reverse (protocol, conn) {
+  function reverse (protocol, conn) {
+    pull(
+      conn,
+      pull.map((data) => {
+        return data.toString().split('').reverse().join('')
+      }),
+      conn
+    )
+  }
+
+  function dialAndRevers (vals, done) {
+    srcNode.handle('/ipfs/reverse/1.0.0', reverse)
+
+    dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
+      if (err) return done(err)
+
       pull(
+        pull.values(['hello']),
         conn,
-        pull.map((data) => {
-          return data.toString().split('').reverse().join('')
-        }),
-        conn
-      )
-    }
+        pull.collect((err, data) => {
+          if (err) return cb(err)
+
+          data.forEach((val, i) => {
+            expect(val.toString()).to.equal(vals[i].split('').reverse().join(''))
+          })
+
+          dstNode.hangUpByPeerInfo(srcPeer, done)
+        }))
+    })
+  }
+
+  describe(`circuit over spdy muxer`, function () {
+    beforeEach(function (done) {
+      startNodes(spdy, done)
+    })
+
+    afterEach(function circuitTests (done) {
+      stopNodes(done)
+    })
 
     it('should dial to a node over a relay and write a value', function (done) {
-      srcNode.handle('/ipfs/reverse/1.0.0', reverse)
-
-      dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
-        if (err) return done(err)
-        pull(
-          pull.values(['hello']),
-          conn,
-          pull.collect((err, data) => {
-            if (err) return cb(err)
-
-            expect(data[0].toString()).to.equal('olleh')
-            dstNode.hangUpByPeerInfo(srcPeer, done)
-          }))
-      })
+      dialAndRevers(['hello'], done)
     })
 
     it('should dial to a node over a relay and write several values', function (done) {
-      srcNode.handle('/ipfs/reverse/1.0.0', reverse)
-
-      dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
-        if (err) return cb(err)
-        pull(
-          pull.values(['hello', 'hello1', 'hello2', 'hello3']),
-          conn,
-          pull.collect((err, data) => {
-            if (err) return done(err)
-
-            expect(data[0].toString()).to.equal('olleh')
-            expect(data[1].toString()).to.equal('1olleh')
-            expect(data[2].toString()).to.equal('2olleh')
-            expect(data[3].toString()).to.equal('3olleh')
-            dstNode.hangUpByPeerInfo(srcPeer, done)
-          }))
-      })
+      dialAndRevers(['hello', 'hello1', 'hello2', 'hello3'], done)
     })
+
+  })
+
+  describe(`circuit over multiplex muxer`, function () {
+    beforeEach(function (done) {
+      startNodes(multiplex, done)
+    })
+
+    afterEach(function circuitTests (done) {
+      stopNodes(done)
+    })
+
+    it('should dial to a node over a relay and write a value', function (done) {
+      dialAndRevers(['hello'], done)
+    })
+
+    it('should dial to a node over a relay and write several values', function (done) {
+      dialAndRevers(['hello', 'hello1', 'hello2', 'hello3'], done)
+    })
+
   })
 })

@@ -18,12 +18,12 @@ const multicodec = require('./multicodec')
 
 const createListener = require('./listener')
 
-class Dialer {
+class CircuitDialer {
   /**
    * Creates an instance of Dialer.
    * @param {Swarm} swarm - the swarm
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   constructor (swarm) {
     this.swarm = swarm
@@ -43,7 +43,7 @@ class Dialer {
    * @param {Function} cb - a callback called once dialed
    * @returns {Connection} - the connection
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   dial (ma, options, cb) {
     if (isFunction(options)) {
@@ -95,7 +95,7 @@ class Dialer {
    * @param {Function} cb - callback to call with relayed connection or error
    * @returns {void}
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   _initiateRelay (dstPeer, cb) {
     let relays = Array.from(this.relayPeers.values())
@@ -136,7 +136,7 @@ class Dialer {
    * @param {any} handler
    * @returns {Listener}
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   createListener (handler) {
     return createListener(this.swarm, handler)
@@ -150,7 +150,7 @@ class Dialer {
    * @param {Function} cb - a callback with that return the negotiated relay connection
    * @returns {void}
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   _negotiateRelay (conn, peerInfo, cb) {
     let src = this.swarm._peerInfo.distinctMultiaddr()
@@ -199,7 +199,7 @@ class Dialer {
    * @param {Function} callback - a callback with the connection to the relay peer
    * @returns {Function|void}
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   _dialRelay (relayPeer, callback) {
     const idB58Str = relayPeer.id.toB58String()
@@ -220,7 +220,7 @@ class Dialer {
    * @param {PeerInfo} peerInfo - the PeerInfo of the relay
    * @returns {void}
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   _addRelayPeer (peerInfo) {
     // TODO: ask connected peers for all their connected peers
@@ -251,7 +251,7 @@ class Dialer {
    * @param {any} multiaddrs
    * @returns {Array<multiaddr>}
    *
-   * @memberOf Dialer
+   * @memberOf CircuitDialer
    */
   filter (multiaddrs) {
     if (!Array.isArray(multiaddrs)) {
@@ -263,4 +263,4 @@ class Dialer {
   }
 }
 
-module.exports = Dialer
+module.exports = CircuitDialer
