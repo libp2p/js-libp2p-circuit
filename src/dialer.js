@@ -10,7 +10,6 @@ const isFunction = require('lodash.isfunction')
 const multiaddr = require('multiaddr')
 const lp = require('pull-length-prefixed')
 const debug = require('debug')
-const EE = require('events').EventEmitter
 
 const log = debug('libp2p:circuit:dialer')
 log.err = debug('libp2p:circuit:error:dialer')
@@ -19,7 +18,7 @@ const multicodec = require('./multicodec')
 
 const createListener = require('./listener')
 
-class Dialer extends {
+class Dialer {
   /**
    * Creates an instance of Dialer.
    * @param {Swarm} swarm - the swarm
