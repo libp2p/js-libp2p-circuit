@@ -23,8 +23,8 @@ class TestNode extends Libp2p {
       transport: transports,
       connection: {
         muxer: [
-          spdy
-          // multiplex
+          // spdy
+          multiplex
         ],
         crypto: [
           // secio
@@ -36,7 +36,9 @@ class TestNode extends Libp2p {
   }
 }
 
-describe('test non common transports over relay', function () {
+describe('test relay', function () {
+  this.timeout(500000)
+
   let srcNode
   let dstNode
   let relayNode
@@ -90,10 +92,10 @@ describe('test non common transports over relay', function () {
       (cb) => {
         dstNode.start(cb)
       },
-      (cb) => relayNode.dialByPeerInfo(dstPeer, (err, conn) => {
+      (cb) => srcNode.dialByPeerInfo(relayPeer, (err, conn) => {
         cb()
       }),
-      (cb) => relayNode.dialByPeerInfo(srcPeer, (err, conn) => {
+      (cb) => dstNode.dialByPeerInfo(relayPeer, (err, conn) => {
         cb()
       })
     ], (err) => done(err))
@@ -113,9 +115,7 @@ describe('test non common transports over relay', function () {
     ], (err) => done(err))
   })
 
-  it('should dial to a node over a relay and write a value', function (done) {
-    this.timeout(500000)
-
+  describe('test basic circuit functionality', function () {
     function reverse (protocol, conn) {
       pull(
         conn,
@@ -126,65 +126,41 @@ describe('test non common transports over relay', function () {
       )
     }
 
-    dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
-      if (err) return done(err)
-      pull(
-        pull.values(['hello']),
-        conn,
-        pull.collect((err, data) => {
-          if (err) return cb(err)
+    it('should dial to a node over a relay and write a value', function (done) {
+      srcNode.handle('/ipfs/reverse/1.0.0', reverse)
 
-          expect(data[0].toString()).to.equal('olleh')
-          done()
-        }))
+      dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
+        if (err) return done(err)
+        pull(
+          pull.values(['hello']),
+          conn,
+          pull.collect((err, data) => {
+            if (err) return cb(err)
+
+            expect(data[0].toString()).to.equal('olleh')
+            dstNode.hangUpByPeerInfo(srcPeer, done)
+          }))
+      })
     })
 
-    srcNode.handle('/ipfs/reverse/1.0.0', reverse)
-  })
+    it('should dial to a node over a relay and write several values', function (done) {
+      srcNode.handle('/ipfs/reverse/1.0.0', reverse)
 
-  it('should dial to a node over a relay and write several values', function (done) {
-    this.timeout(500000)
+      dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
+        if (err) return cb(err)
+        pull(
+          pull.values(['hello', 'hello1', 'hello2', 'hello3']),
+          conn,
+          pull.collect((err, data) => {
+            if (err) return done(err)
 
-    function reverse (protocol, conn) {
-      pull(
-        conn,
-        pull.map((data) => {
-          return data.toString().split('').reverse().join('')
-        }),
-        conn
-      )
-    }
-
-    srcNode.handle('/ipfs/reverse/1.0.0', reverse)
-    waterfall([
-      (cb) => srcNode.dialByPeerInfo(relayPeer, () => {
-        cb()
-      }),
-      (cb) => dstNode.dialByPeerInfo(relayPeer, () => {
-        cb()
-      }),
-      (cb) => {
-        waterfall([
-          // TODO: make sure the WebSockets dials first, because TCP hangs the stream!!! possibly a bug in TCP....
-          (cb) => {
-            dstNode.dialByPeerInfo(srcPeer, '/ipfs/reverse/1.0.0', (err, conn) => {
-              if (err) return cb(err)
-              pull(
-                pull.values(['hello', 'hello1', 'hello2', 'hello3']),
-                conn,
-                pull.collect((err, data) => {
-                  if (err) return cb(err)
-
-                  expect(data[0].toString()).to.equal('olleh')
-                  expect(data[1].toString()).to.equal('1olleh')
-                  expect(data[2].toString()).to.equal('2olleh')
-                  expect(data[3].toString()).to.equal('3olleh')
-                  cb()
-                }))
-            })
-          }
-        ], done)
-      }
-    ])
+            expect(data[0].toString()).to.equal('olleh')
+            expect(data[1].toString()).to.equal('1olleh')
+            expect(data[2].toString()).to.equal('2olleh')
+            expect(data[3].toString()).to.equal('3olleh')
+            dstNode.hangUpByPeerInfo(srcPeer, done)
+          }))
+      })
+    })
   })
 })

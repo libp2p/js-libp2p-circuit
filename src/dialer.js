@@ -27,11 +27,11 @@ class Dialer {
    */
   constructor (swarm) {
     this.swarm = swarm
-    this.peers = new Map()
+    this.relayPeers = new Map()
 
     this.swarm.on('peer-mux-established', this._addRelayPeer.bind(this))
     this.swarm.on('peer-mux-closed', (peerInfo) => {
-      this.peers.delete(peerInfo.id.toB58String())
+      this.relayPeers.delete(peerInfo.id.toB58String())
     })
   }
 
@@ -46,7 +46,6 @@ class Dialer {
    * @memberOf Dialer
    */
   dial (ma, options, cb) {
-    let dstConn = new Connection()
     if (isFunction(options)) {
       cb = options
       options = {}
@@ -59,20 +58,14 @@ class Dialer {
 
     let idB58Str
     ma = multiaddr(ma)
-    idB58Str = ma.getPeerId() // try to get the peerid from the multiaddr
+    idB58Str = ma.getPeerId() // try to get the peerId from the multiaddr
     if (!idB58Str) {
       let err = 'No valid peer id in multiaddr'
       log.err(err)
       cb(err)
     }
 
-    if (this.peers.has(idB58Str)) {
-      dstConn.setInnerConn(
-        this.peers.get(idB58Str).conn,
-        this.peers.get(idB58Str).peerInfo)
-      return dstConn
-    }
-
+    let dstConn = new Connection()
     PeerInfo.create(idB58Str, (err, dstPeer) => {
       if (err) {
         log.err(err)
@@ -88,6 +81,7 @@ class Dialer {
         }
 
         dstConn.setInnerConn(conn)
+        cb(null, dstConn)
       })
     })
 
@@ -104,10 +98,12 @@ class Dialer {
    * @memberOf Dialer
    */
   _initiateRelay (dstPeer, cb) {
-    let relays = Array.from(this.peers.values())
+    let relays = Array.from(this.relayPeers.values())
     let next = (relayPeer) => {
       if (!relayPeer) {
-        return cb(`no relay peers were found!`)
+        const err = `no relay peers were found!`
+        log.err(err)
+        return cb(err)
       }
 
       log(`Trying relay peer ${relayPeer.peerInfo.id.toB58String()}`)
@@ -182,7 +178,14 @@ class Dialer {
         }
 
         shake.write(encoded[0])
-        cb(null, shake.rest())
+        shake.read(1, (err, data) => {
+          if (err) {
+            log.err(err)
+            return cb(err)
+          }
+
+          cb(null, shake.rest())
+        })
       })
     )
 
@@ -226,18 +229,18 @@ class Dialer {
     // TODO: ask peers if they can proactively dial on your behalf to other peers (active/passive)
     // should it be a multistream header?
 
-    if (!this.peers.has(peerInfo.id.toB58String())) {
+    if (!this.relayPeers.has(peerInfo.id.toB58String())) {
       let peer = new Peer(null, peerInfo)
-      this.peers.set(peerInfo.id.toB58String(), peer)
+      this.relayPeers.set(peerInfo.id.toB58String(), peer)
 
       // attempt to dia the relay so that we have a connection
-      setImmediate(() => this._dialRelay(peerInfo, (err, conn) => {
+      this._dialRelay(peerInfo, (err, conn) => {
         if (err) {
           log.err(err)
           return
         }
         peer.attachConnection(conn)
-      }))
+      })
     }
   }
 

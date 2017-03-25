@@ -5,7 +5,6 @@ const lp = require('pull-length-prefixed')
 const multiaddr = require('multiaddr')
 const Peer = require('./peer')
 const handshake = require('pull-handshake')
-const Connection = require('interface-connection').Connection
 const utils = require('./utils')
 const debug = require('debug')
 const includes = require('lodash/includes')
@@ -14,8 +13,8 @@ const PeerId = require('peer-id')
 
 const multicodec = require('./multicodec')
 
-const log = debug('libp2p:circuit:listener')
-log.err = debug('libp2p:circuit:error:listener')
+const log = debug('libp2p:circuit:circuit')
+log.err = debug('libp2p:circuit:error:circuit')
 
 class Circuit {
 
@@ -37,70 +36,19 @@ class Circuit {
   }
 
   /**
-   * The handler that will be mounted by the swarm
    *
-   * @param {Connection} conn - this is the incoming connection
-   * @param {Function} cb - callback that will either return the relayed
-   *                        connection or null if the request was a to relay
-   *                        to another peer
+   * @param conn
+   * @param peerInfo
+   * @param dstAddr
+   * @param cb
    */
-  handler (conn, cb) {
-    setImmediate(() => conn.getPeerInfo((err, peerInfo) => {
-      if (err) {
-        log.err('Failed to identify incoming conn', err)
-        return cb(err, pull(pull.empty(), conn))
-      }
-
-      const idB58Str = peerInfo.id.toB58String()
-      let srcPeer = this.peers.get(idB58Str)
-      if (!srcPeer) {
-        log('new peer: ', idB58Str)
-        srcPeer = new Peer(conn, peerInfo)
-        this.peers.set(idB58Str, srcPeer)
-      }
-      return this._processConnection(srcPeer, conn, cb)
-    }))
-  }
-
-  _processConnection (peerInfo, conn, cb) {
-    let stream = handshake({timeout: 1000 * 60})
-    let shake = stream.handshake
-
-    lp.decodeFromReader(shake, (err, msg) => {
-      if (err) {
-        log.err(err)
-        return
-      }
-
-      let addr = multiaddr(msg.toString())
-      let newConn = new Connection(shake.rest(), conn)
-      peerInfo.attachConnection(newConn)
-
-      // make a circuit
-      if (includes(addr.protoNames(), 'p2p-circuit')) {
-        this._circuit(shake.rest(), addr, cb)
-        return
-      }
-
-      // we just got a circuit connection lets return it to the swarm
-      let idB58Str = addr.getPeerId()
-      if (!idB58Str) {
-        let err = 'No valid peer id in multiaddr'
-        log.err(err)
-        cb(err)
-      }
-
-      let peer = new Peer(conn, peerInfo)
-      this.peers.set(idB58Str, peer)
-
-      cb(null, newConn)
-    })
-
-    pull(stream, conn, stream)
+  handler (conn, dstAddr, cb) {
+    this._circuit(conn, dstAddr, cb)
   }
 
   _dialPeer (ma, callback) {
     const peerInfo = new PeerInfo(PeerId.createFromB58String(ma.getPeerId()))
+    peerInfo.multiaddr.add(ma)
     this.swarm.dial(peerInfo, multicodec, (err, conn) => {
       if (err) {
         log.err(err)
@@ -136,16 +84,9 @@ class Circuit {
       let stream = handshake({timeout: 1000 * 60}, cb)
       let shake = stream.handshake
 
-      // create handshake stream
-      pull(
-        stream,
-        dstConn,
-        stream
-      )
-
       dstConn.getPeerInfo((err, peerInfo) => {
         pull(
-          pull.values([new Buffer(utils.getDstAddrAsString(peerInfo))]),
+          pull.values([new Buffer(`/ipfs/${peerInfo.id.toB58String()}`)]),
           lp.encode(),
           pull.collect((err, encoded) => {
             if (err) {
@@ -163,6 +104,14 @@ class Circuit {
           })
         )
       })
+
+      // create handshake stream
+      pull(
+        stream,
+        dstConn,
+        stream
+      )
+      
     })
   }
 }
