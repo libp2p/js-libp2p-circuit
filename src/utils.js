@@ -1,7 +1,8 @@
 'use strict'
-const config = require('./config')
+const debug = require('debug')
 
-const log = config.log
+const log = debug('libp2p:circuit:utils')
+log.err = debug('libp2p:circuit:error:utils')
 
 function getDstAddrAsString (peerInfo) {
   return getStrAddress(peerInfo)
