@@ -1,5 +1,5 @@
 module.exports = {
   Circuit: require('./circuit'),
-  Dialer: require('./dialer'),
+  CircuitDialer: require('./circuit-dialer'),
   multicodec: require('./multicodec')
 }

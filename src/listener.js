@@ -9,6 +9,7 @@ const lp = require('pull-length-prefixed')
 const multiaddr = require('multiaddr')
 const handshake = require('pull-handshake')
 const Connection = require('interface-connection').Connection
+const abortable = require('pull-abortable')
 
 const debug = require('debug')
 
@@ -53,8 +54,8 @@ module.exports = (swarm, handler) => {
             })
           } else {
             // we need this to signal the circuit that the connection is ready
-            // otherwise, it seems be get circuited prematurely, which causes the
-            // dialer to fail on a non ready connection
+            // otherwise, the circuit will happen prematurely, which causes the
+            // dialer to fail since the connection is not ready
             shake.write('\n')
             let newConn = new Connection(shake.rest(), conn)
             listener.emit('connection', newConn)
@@ -62,7 +63,10 @@ module.exports = (swarm, handler) => {
           }
         })
 
-        pull(stream, conn, stream)
+        pull(
+          stream,
+          conn,
+          stream)
       })
     })
 
@@ -70,9 +74,13 @@ module.exports = (swarm, handler) => {
     cb()
   }
 
-  listener.close = () => {
+  listener.close = (cb) => {
+    // TODO: should we close/abort connections here?
+    // spdy-transport throw a `Error: socket hang up`
+    // on swarm stop right now, could be an existing issue?
     swarm.unhandle(multicodec)
     listener.emit('close')
+    cb()
   }
 
   listener.getAddrs = (callback) => {
