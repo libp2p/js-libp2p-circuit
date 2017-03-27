@@ -1,7 +1,8 @@
 'use strict'
 
 module.exports = {
-  Circuit: require('./circuit-relay'),
-  CircuitDialer: require('./circuit-dialer'),
-  multicodec: require('./multicodec')
+  CircuitRelay: require('./circuit-relay'),
+  Dialer: require('./circuit-dialer'),
+  multicodec: require('./multicodec'),
+  tag: 'Circuit'
 }

@@ -33,7 +33,10 @@
   "eslintConfig": {
     "extends": [
       "./node_modules/aegir/config/eslintrc.yml"
-    ]
+    ],
+    "rules": {
+      "strict": "off"
+    }
   },
   "devDependencies": {
     "aegir": "^10.0.0",

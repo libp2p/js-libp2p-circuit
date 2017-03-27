@@ -15,9 +15,9 @@ const debug = require('debug')
 const log = debug('libp2p:circuit:listener')
 log.err = debug('libp2p:circuit:error:listener')
 
-module.exports = (swarm, handler) => {
+module.exports = (swarm, handler, options) => {
   const listener = new EE()
-  const circuit = new Circuit(swarm)
+  const relayCircuit = new Circuit(swarm)
 
   listener.listen = (ma, cb) => {
     cb = cb || (() => {})
@@ -32,16 +32,22 @@ module.exports = (swarm, handler) => {
         let stream = handshake({timeout: 1000 * 60})
         let shake = stream.handshake
 
+        pull(
+          stream,
+          conn,
+          stream
+        )
+
         lp.decodeFromReader(shake, (err, msg) => {
           if (err) {
             log.err(err)
             return
           }
 
-          let addr = multiaddr(msg.toString())
+          let addr = multiaddr(msg.toString()) // read the src multiaddr
           // make a circuit
           if (includes(addr.protoNames(), 'p2p-circuit')) {
-            circuit.handler(shake.rest(), addr, (err) => {
+            relayCircuit.circuit(shake.rest(), addr, (err) => {
               if (err) {
                 log.err(err)
                 listener.emit('error', err)
@@ -61,11 +67,6 @@ module.exports = (swarm, handler) => {
             handler(null, newConn)
           }
         })
-
-        pull(
-          stream,
-          conn,
-          stream)
       })
     })
 
@@ -74,9 +75,10 @@ module.exports = (swarm, handler) => {
   }
 
   listener.close = (cb) => {
-    // TODO: should we close/abort connections here?
+    // TODO: should we close/abort the connection here?
     // spdy-transport throws a `Error: socket hang up`
-    // on swarm stop right now, could be an existing issue?
+    // on swarm stop right now, I think it's because
+    // the socket is abruptly closed?
     swarm.unhandle(multicodec)
     listener.emit('close')
     cb()
@@ -87,7 +89,17 @@ module.exports = (swarm, handler) => {
       return includes(addr.protoNames(), 'p2p-circuit')
     })
 
-    callback(null, addrs)
+    const listenAddrs = []
+    addrs.forEach((addr) => {
+      const peerMa = `/p2p-circuit/ipfs/${swarm._peerInfo.id.toB58String()}`
+      if (addr.toString() !== peerMa) {
+        listenAddrs.push(addr.encapsulate(peerMa))
+      } else {
+        listenAddrs.push(peerMa)
+      }
+    })
+
+    callback(null, listenAddrs)
   }
 
   return listener

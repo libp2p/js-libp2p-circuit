@@ -2,10 +2,10 @@
 
 const pull = require('pull-stream')
 const handshake = require('pull-handshake')
-const Peer = require('./peer')
 const Connection = require('interface-connection').Connection
 const mafmt = require('mafmt')
 const PeerInfo = require('peer-info')
+const PeerId = require('peer-id')
 const isFunction = require('lodash.isfunction')
 const multiaddr = require('multiaddr')
 const lp = require('pull-length-prefixed')
@@ -22,12 +22,39 @@ class CircuitDialer {
   /**
    * Creates an instance of Dialer.
    * @param {Swarm} swarm - the swarm
+   * @param {any} config
    *
    * @memberOf CircuitDialer
    */
-  constructor (swarm) {
+  constructor (swarm, config) {
     this.swarm = swarm
     this.relayPeers = new Map()
+    this.config = config
+    this._swarmHandler = null
+
+    const relays = this.filter(swarm._peerInfo.multiaddrs)
+    if (relays.length === 0) {
+      this.swarm._peerInfo.multiaddr.add(`/p2p-circuit/ipfs/${this.swarm._peerInfo.id.toB58String()}`)
+    }
+
+    // if we have relay addresses in swarm config, then dial those relays
+    this.swarm.on('listening', () => {
+      relays.forEach((relay) => {
+        // once dialed and muxed the circuit will register the relay
+        const relayPeer = new PeerInfo(PeerId.createFromB58String(relay.getPeerId()))
+        // get a dialable address
+
+        let addr = relay
+        // if we have an explicit transport addres (ip4,ws,etc...) then leave it and dial that explicitly
+        let reliable = multiaddr(relay.toString().replace(/^\/p2p-circuit/, '')).decapsulate('ipfs')
+        if (mafmt.Reliable.matches(reliable)) {
+          addr = reliable
+        }
+
+        relayPeer.multiaddr.add(addr)
+        this._addRelayPeer(relayPeer)
+      })
+    })
 
     this.swarm.on('peer-mux-established', this._addRelayPeer.bind(this))
     this.swarm.on('peer-mux-closed', (peerInfo) => {
@@ -52,81 +79,156 @@ class CircuitDialer {
     }
 
     if (!cb) {
-      cb = () => {
-      }
-    }
-
-    let idB58Str
-    ma = multiaddr(ma)
-    idB58Str = ma.getPeerId() // try to get the peerId from the multiaddr
-    if (!idB58Str) {
-      let err = 'No valid peer id in multiaddr'
-      log.err(err)
-      cb(err)
+      cb = () => {}
     }
 
     let dstConn = new Connection()
-    PeerInfo.create(idB58Str, (err, dstPeer) => {
-      if (err) {
-        log.err(err)
-        cb(err)
-      }
+    let mas = multiaddr(ma).toString().split('/p2p-circuit')
 
-      dstConn.setPeerInfo(dstPeer)
-      dstPeer.multiaddr.add(ma)
-      this._initiateRelay(dstPeer, (err, conn) => {
+    mas = mas.filter((m) => m.length) // filter out empty
+    const dialNext = (relay, dst) => {
+      this._addRelayPeer(relay, (err, relayConn) => {
         if (err) {
           log.err(err)
-          return dstConn.setInnerConn(pull.empty())
+          return cb(err)
+        }
+
+        this._dialPeer(multiaddr(dst), relayConn, (err, conn) => {
+          if (err) {
+            log.err(err)
+            return cb(err)
+          }
+
+          if (mas.length > 1) {
+            conn.getPeerInfo((err, peerInfo) => {
+              if (err) {
+                log.err(err)
+                return cb(err)
+              }
+
+              this.relayPeers.set(peerInfo.id.toB58String(), conn) // add the connection to the list of relays
+              dialNext(peerInfo, mas.shift())
+            })
+          } else {
+            dstConn.setInnerConn(conn)
+          }
+        })
+      })
+    }
+
+    if (mas.length > 1) {
+      const relayMa = multiaddr(mas.shift())
+      const relayPeer = new PeerInfo(PeerId.createFromB58String(relayMa.getPeerId()))
+      relayPeer.multiaddr.add(relayMa)
+      dialNext(relayPeer, mas.shift())
+    } else {
+      this._dialPeer(mas.shift(), (err, conn) => {
+        if (err) {
+          log.err(err)
+          return cb(err)
         }
 
         dstConn.setInnerConn(conn)
         cb(null, dstConn)
       })
-    })
+    }
 
     return dstConn
+  }
+
+  _dialPeer (ma, relay, cb) {
+    if (isFunction(relay)) {
+      cb = relay
+      relay = null
+    }
+
+    if (!cb) {
+      cb = () => {}
+    }
+
+    ma = multiaddr(ma)
+    PeerInfo.create(ma.getPeerId(), (err, dstPeer) => {
+      if (err) {
+        log.err(err)
+        return cb(err)
+      }
+
+      if (!(ma.toString().indexOf('p2p-circuit') > 0)) {
+        ma = multiaddr('/p2p-circuit').encapsulate(ma)
+      }
+
+      dstPeer.multiaddr.add(ma)
+      this._initiateRelay(dstPeer, relay, (err, conn) => {
+        if (err) {
+          log.err(err)
+          return cb(err)
+        }
+
+        cb(null, new Connection(conn, dstPeer))
+      })
+    })
   }
 
   /**
    * Initate the relay connection
    *
    * @param {PeerInfo} dstPeer - the destination peer
+   * @param {Connection} relay - an existing relay connection to dial on
    * @param {Function} cb - callback to call with relayed connection or error
    * @returns {void}
    *
    * @memberOf CircuitDialer
    */
-  _initiateRelay (dstPeer, cb) {
-    let relays = Array.from(this.relayPeers.values())
-    let next = (relayPeer) => {
+  _initiateRelay (dstPeer, relay, cb) {
+    if (isFunction(relay)) {
+      cb = relay
+      relay = null
+    }
+
+    if (!cb) {
+      cb = () => {}
+    }
+
+    const relays = Array.from(this.relayPeers.values()).shift()
+    const next = (relayPeer) => {
       if (!relayPeer) {
         const err = `no relay peers were found!`
         log.err(err)
         return cb(err)
       }
 
-      log(`Trying relay peer ${relayPeer.peerInfo.id.toB58String()}`)
-      this._dialRelay(relayPeer.peerInfo, (err, conn) => {
+      relayPeer.getPeerInfo((err, peerInfo) => {
         if (err) {
-          if (relays.length > 0) {
-            return next(relays.shift())
-          }
+          log.err(err)
           return cb(err)
         }
 
-        this._negotiateRelay(conn, dstPeer, (err, conn) => {
+        log(`Trying relay peer ${peerInfo.id.toB58String()}`)
+        this._dialRelay(peerInfo, (err, conn) => {
           if (err) {
-            log.err(`An error has occurred negotiating the relay connection`, err)
+            if (relays.length > 0) {
+              return next(relays.shift())
+            }
             return cb(err)
           }
 
-          return cb(null, conn)
+          this._negotiateRelay(conn, dstPeer, (err, conn) => {
+            if (err) {
+              log.err(`An error has occurred negotiating the relay connection`, err)
+              return cb(err)
+            }
+
+            return cb(null, conn)
+          })
         })
       })
     }
 
-    next(relays.shift())
+    if (relay) {
+      next(relay)
+    } else {
+      next(relays)
+    }
   }
 
   /**
@@ -137,7 +239,15 @@ class CircuitDialer {
    * @returns {listener}
    */
   createListener (handler, options) {
-    return createListener(this.swarm, handler)
+    return createListener(this.swarm, handler, this.config)
+  }
+
+  installSwarmHandler (handler) {
+    this._swarmHandler = handler
+  }
+
+  get handler () {
+    return this._swarmHandler
   }
 
   /**
@@ -216,30 +326,33 @@ class CircuitDialer {
    * Connect to a relay peer
    *
    * @param {PeerInfo} peerInfo - the PeerInfo of the relay
+   * @param {Function} cb
    * @returns {void}
    *
    * @memberOf CircuitDialer
    */
-  _addRelayPeer (peerInfo) {
-    // TODO: ask connected peers for all their connected peers
-    // as well and try to establish a relay to them as well
+  _addRelayPeer (peerInfo, cb) {
+    cb = cb || (() => {})
 
-    // TODO: ask peers if they can proactively dial on your behalf to other peers (active/passive)
-    // should it be a multistream header?
-
-    if (!this.relayPeers.has(peerInfo.id.toB58String())) {
-      let peer = new Peer(null, peerInfo)
-      this.relayPeers.set(peerInfo.id.toB58String(), peer)
-
-      // attempt to dia the relay so that we have a connection
-      this._dialRelay(peerInfo, (err, conn) => {
-        if (err) {
-          log.err(err)
-          return
-        }
-        peer.attachConnection(conn)
-      })
+    const relay = this.relayPeers.get(peerInfo.id.toB58String())
+    if (relay) {
+      cb(null, relay)
     }
+
+    const relayConn = new Connection()
+    relayConn.setPeerInfo(peerInfo)
+    // attempt to dia the relay so that we have a connection
+    this.relayPeers.set(peerInfo.id.toB58String(), relayConn)
+    this._dialRelay(peerInfo, (err, conn) => {
+      if (err) {
+        log.err(err)
+        this.relayPeers.delete(peerInfo.id.toB58String())
+        return cb(err)
+      }
+
+      relayConn.setInnerConn(conn)
+      cb(null, cb)
+    })
   }
 
   /**

@@ -2,7 +2,6 @@
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const Peer = require('./peer')
 const handshake = require('pull-handshake')
 const debug = require('debug')
 const PeerInfo = require('peer-info')
@@ -26,10 +25,8 @@ class Circuit {
    */
   constructor (swarm) {
     this.swarm = swarm
-    this.peers = new Map()
-    this.relaySessions = new Map()
 
-    this.handler = this.handler.bind(this)
+    this.circuit = this.circuit.bind(this)
   }
 
   /**
@@ -41,7 +38,7 @@ class Circuit {
    *
    * @return {void}
    */
-  handler (conn, dstAddr, cb) {
+  circuit (conn, dstAddr, cb) {
     this._circuit(conn, dstAddr, cb)
   }
 
@@ -60,15 +57,7 @@ class Circuit {
           return
         }
 
-        const idB58Str = peerInfo.id.toB58String()
-        // If already had a dial to me, just add the conn
-        if (!this.peers.has(idB58Str)) {
-          this.peers.set(idB58Str, new Peer(conn, peerInfo))
-        } else {
-          this.peers.get(idB58Str).attachConnection(conn)
-        }
-
-        callback(null, this.peers.get(idB58Str).conn)
+        callback(null, conn)
       })
     })
   }
@@ -98,6 +87,13 @@ class Circuit {
           return cb(err)
         }
 
+        // create handshake stream
+        pull(
+          stream,
+          dstConn,
+          stream
+        )
+
         pull(
           pull.values([new Buffer(`/ipfs/${peerInfo.id.toB58String()}`)]),
           lp.encode(),
@@ -117,13 +113,6 @@ class Circuit {
           })
         )
       })
-
-      // create handshake stream
-      pull(
-        stream,
-        dstConn,
-        stream
-      )
     })
   }
 }
