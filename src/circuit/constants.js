@@ -1,7 +1,6 @@
 'use strict'
 
 module.exports = {
-  PRIOIRY: 100,
   DIALER: {
     ONION: 'onion',
     TELESCOPE: 'telescope'

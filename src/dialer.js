@@ -72,14 +72,6 @@ class Dialer {
     })
   }
 
-  get priority () {
-    return constants.PRIOIRY // TODO: move to a constants file that all transports can share
-  }
-
-  set priority (val) {
-    throw new Error('Priority is read only!')
-  }
-
   /**
    * Dial a peer over a relay
    *
