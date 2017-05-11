@@ -30,21 +30,11 @@
     "url": "https://github.com/libp2p/js-libp2p-circuit/issues"
   },
   "homepage": "https://github.com/libp2p/js-libp2p-circuit#readme",
-  "eslintConfig": {
-    "extends": [
-      "./node_modules/aegir/config/eslintrc.yml"
-    ],
-    "rules": {
-      "strict": "off"
-    }
-  },
   "devDependencies": {
     "aegir": "^10.0.0",
     "chai": "^3.5.0",
-    "multihashes": "^0.4.5",
     "pre-commit": "^1.2.2",
     "proxyquire": "^1.7.11",
-    "pull-pushable": "^2.0.1",
     "sinon": "^2.1.0"
   },
   "contributors": [],
@@ -53,13 +43,14 @@
     "debug": "^2.6.1",
     "interface-connection": "^0.3.1",
     "lodash": "^4.17.4",
+    "mafmt": "^2.1.8",
     "multiaddr": "^2.2.1",
     "multistream-select": "^0.13.4",
     "peer-id": "^0.8.2",
-    "peer-info": "^0.8.3",
+    "peer-info": "^0.8.5",
     "pull-abortable": "^4.1.0",
     "pull-handshake": "^1.1.4",
-    "pull-stream": "^3.5.0",
+    "pull-stream": "^3.5.1",
     "safe-buffer": "^5.0.1",
     "setimmediate": "^1.0.5"
   }
