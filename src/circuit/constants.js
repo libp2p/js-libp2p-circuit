@@ -7,7 +7,6 @@ module.exports = {
   },
   RESPONSE: {
     SUCCESS: 100,
-    FAILURE: 500,
     HOP: {
       SRC_ADDR_TOO_LONG: 220,
       DST_ADDR_TOO_LONG: 221,

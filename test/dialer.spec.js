@@ -125,7 +125,7 @@ describe('dialer tests', function () {
         if (err) return done(err)
 
         pull(
-          pull.values([Buffer.from(String(constants.RESPONSE.FAILURE))]),
+          pull.values([Buffer.from(String(500))]), // send arbitrary non 200 code
           lp.encode(),
           pull.collect((err, encoded) => {
             expect(err).to.be.null
