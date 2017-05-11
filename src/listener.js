@@ -1,16 +1,12 @@
 'use strict'
 
-require('safe-buffer')
 require('setimmediate')
 
 const multicodec = require('./multicodec')
 const EE = require('events').EventEmitter
 const multiaddr = require('multiaddr')
-const Connection = require('interface-connection').Connection
 const mafmt = require('mafmt')
-const constants = require('./circuit/constants')
-const waterfall = require('async/waterfall')
-const StreamHandler = require('./circuit/stream-handler')
+const Stop = require('./circuit/stop')
 
 const debug = require('debug')
 
@@ -19,64 +15,13 @@ log.err = debug('libp2p:circuit:error:listener')
 
 module.exports = (swarm, options, handler) => {
   const listener = new EE()
+  const stopHandler = new Stop(swarm)
 
   listener.listen = (ma, callback) => {
     callback = callback || (() => {})
 
     swarm.handle(multicodec.stop, (proto, conn) => {
-      conn.getPeerInfo((err, peerInfo) => {
-        if (err) {
-          log.err('Failed to identify incoming connection', err)
-          return handler(err, null)
-        }
-
-        const streamHandler = new StreamHandler(conn)
-        waterfall([
-          (cb) => {
-            streamHandler.read((err, msg) => {
-              if (err) {
-                log.err(err)
-
-                if (err.includes('size longer than max permitted length of')) {
-                  const errCode = String(constants.RESPONSE.STOP.SRC_ADDR_TOO_LONG)
-                  setImmediate(() => this.emit('circuit:error', errCode))
-                  streamHandler.write([Buffer.from(errCode)])
-                }
-
-                return cb(err)
-              }
-
-              let srcMa = null
-              try {
-                srcMa = multiaddr(msg.toString())
-              } catch (err) {
-                const errCode = String(constants.RESPONSE.STOP.SRC_MULTIADDR_INVALID)
-                setImmediate(() => this.emit('circuit:error', errCode))
-                streamHandler.write([Buffer.from(errCode)])
-                return cb(errCode)
-              }
-
-              // add the addr we got along with the relay request
-              peerInfo.multiaddrs.add(srcMa)
-              cb()
-            })
-          },
-          (cb) => {
-            streamHandler.write([Buffer.from(String(constants.RESPONSE.SUCCESS))], (err) => {
-              if (err) {
-                log.err(err)
-                return cb(err)
-              }
-
-              const newConn = new Connection(streamHandler.rest(), conn)
-              newConn.setPeerInfo(peerInfo)
-              setImmediate(() => listener.emit('connection', newConn))
-              handler(newConn)
-              cb()
-            })
-          }
-        ])
-      })
+      stopHandler.handle(conn, handler)
     })
 
     setImmediate(() => listener.emit('listen'))
