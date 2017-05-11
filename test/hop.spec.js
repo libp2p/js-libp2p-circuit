@@ -1,7 +1,7 @@
 /* eslint-env mocha */
 'use strict'
 
-const Relay = require('../src/circuit/relay')
+const Hop = require('../src/circuit/hop')
 const Dialer = require('../src/circuit/dialer')
 const nodes = require('./fixtures/nodes')
 const Connection = require('interface-connection').Connection
@@ -19,7 +19,7 @@ const expect = require('chai').expect
 
 describe('relay', function () {
   describe(`handle circuit requests`, function () {
-    const relay = sinon.createStubInstance(Relay)
+    const relay = sinon.createStubInstance(Hop)
     const dialer = sinon.createStubInstance(Dialer)
 
     let swarm

@@ -21,7 +21,7 @@ const log = debug('libp2p:swarm:circuit:relay')
 log.err = debug('libp2p:swarm:circuit:error:relay')
 
 let utils
-class Relay extends EE {
+class Hop extends EE {
   /**
    * Construct a Circuit object
    *
@@ -197,4 +197,4 @@ class Relay extends EE {
   }
 }
 
-module.exports = Relay
+module.exports = Hop
