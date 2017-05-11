@@ -1,7 +1,6 @@
 'use strict'
 
-require('setimmediate')
-require('safe-buffer')
+const setImmediate = require('async/setImmediate')
 
 const Dialer = require('./dialer')
 const isFunction = require('lodash.isfunction')

@@ -1,6 +1,6 @@
 'use strict'
 
-require('setimmediate')
+const setImmediate = require('async/setImmediate')
 
 const multicodec = require('./multicodec')
 const EE = require('events').EventEmitter
