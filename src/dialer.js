@@ -3,7 +3,6 @@
 const mafmt = require('mafmt')
 const multiaddr = require('multiaddr')
 
-const constants = require('./circuit/constants')
 const OnionDialer = require('./circuit/onion-dialer')
 const utilsFactory = require('./circuit/utils')
 
