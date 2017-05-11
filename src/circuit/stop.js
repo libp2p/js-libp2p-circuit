@@ -1,6 +1,6 @@
 'use strict'
 
-require('setimmediate')
+const setImmediate = require('async/setImmediate')
 
 const EE = require('events').EventEmitter
 const Buffer = require('safe-buffer').Buffer

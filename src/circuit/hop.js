@@ -87,10 +87,6 @@ class Hop extends EE {
         return this._writeErr(streamHandler, constants.RESPONSE.HOP.CANT_CONNECT_TO_SELF, cb)
       }
 
-      if (!this.active && !utils.isPeerConnected(dstMa.getPeerId())) {
-        return this._writeErr(streamHandler, constants.RESPONSE.HOP.NO_CONN_TO_DST, cb)
-      }
-
       cb(null, dstMa)
     })
   }
@@ -107,7 +103,17 @@ class Hop extends EE {
     this.swarm.handle(multicodec.hop, (proto, conn) => {
       const streamHandler = new StreamHandler(conn, 1000 * 60)
       waterfall([
-        (cb) => this._readDstAddr(streamHandler, cb),
+        (cb) => this._readDstAddr(streamHandler, (err, dstMa) => {
+          if (err) {
+            return cb(err)
+          }
+
+          if (!this.active && !utils.isPeerConnected(dstMa.getPeerId())) {
+            return this._writeErr(streamHandler, constants.RESPONSE.HOP.NO_CONN_TO_DST, cb)
+          }
+
+          cb(null, dstMa)
+        }),
         (dstMa, cb) => {
           this._readSrcAddr(streamHandler, (err, srcMa) => {
             cb(err, dstMa, srcMa)
