@@ -1,6 +1,6 @@
 'use strict'
 
-require('safe-buffer')
+const Buffer = require('safe-buffer').Buffer
 
 const Connection = require('interface-connection').Connection
 const isFunction = require('lodash.isfunction')
