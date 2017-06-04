@@ -19,9 +19,9 @@ const expect = require('chai').expect
 
 describe('relay', function () {
   describe(`handle circuit requests`, function () {
-    const relay = sinon.createStubInstance(Hop)
     const dialer = sinon.createStubInstance(Dialer)
 
+    let relay
     let swarm
     let fromConn
     let toConn
@@ -55,13 +55,9 @@ describe('relay', function () {
           cb()
         }
       ], () => {
-        relay.mount.callThrough()
-        relay.emit.callThrough()
-        relay.on.callThrough()
-        relay._readDstAddr.callThrough()
-        relay._readSrcAddr.callThrough()
-        relay._writeErr.callThrough()
+        relay = new Hop({enabled: true})
         relay.mount(swarm) // mount the swarm
+        relay._circuit = sinon.stub()
         relay._circuit.callsArg(3, null, toConn)
 
         dialer.relayConns = new Map()
@@ -71,14 +67,7 @@ describe('relay', function () {
     })
 
     afterEach(() => {
-      relay.mount.reset()
-      relay.emit.reset()
-      relay.on.reset()
       relay._circuit.reset()
-      relay._readDstAddr.reset()
-      relay._readSrcAddr.reset()
-      relay._readSrcAddr.reset()
-      dialer.negotiateRelay.reset()
     })
 
     it(`handle a valid circuit request`, function (done) {

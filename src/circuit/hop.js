@@ -14,6 +14,7 @@ const once = require('once')
 const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
 const waterfall = require('async/waterfall')
+const assignInWith = require('lodash/assignInWith')
 
 const multicodec = require('./../multicodec')
 
@@ -33,7 +34,16 @@ class Hop extends EE {
    */
   constructor (options) {
     super()
-    this.config = Object.assign({active: false}, options)
+    this.config = assignInWith(
+      {
+        active: false,
+        enabled: false
+      },
+      options,
+      (orig, src) => {
+        typeof src === 'undefined' ? false : src
+      })
+
     this.swarm = null
     this.active = this.config.active
   }
@@ -98,6 +108,10 @@ class Hop extends EE {
    * @return {void}
    */
   mount (swarm) {
+    if (!this.config.enabled) {
+      return
+    }
+
     this.swarm = swarm
     utils = utilsFactory(swarm)
     this.swarm.handle(multicodec.hop, (proto, conn) => {
