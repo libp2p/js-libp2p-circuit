@@ -57,8 +57,12 @@ module.exports = (swarm, options, handler) => {
       }
 
       if (!mafmt.Circuit.matches(addr)) {
-        // by default we're reachable over any relay
-        listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(`${addr}/ipfs/${swarm._peerInfo.id.toB58String()}`))
+        if (addr.getPeerId() !== null) {
+          // by default we're reachable over any relay
+          listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(addr))
+        } else {
+          listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(`${addr}/ipfs/${swarm._peerInfo.id.toB58String()}`))
+        }
       } else {
         listenAddrs.push(addr.encapsulate(`/ipfs/${swarm._peerInfo.id.toB58String()}`))
       }
