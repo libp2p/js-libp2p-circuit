@@ -34,7 +34,6 @@
     "aegir": "^10.0.0",
     "chai": "^3.5.0",
     "pre-commit": "^1.2.2",
-    "proxyquire": "^1.7.11",
     "sinon": "^2.1.0"
   },
   "contributors": [],
@@ -48,6 +47,7 @@
     "multistream-select": "^0.13.4",
     "peer-id": "^0.8.2",
     "peer-info": "^0.8.5",
+    "protocol-buffers": "^3.2.1",
     "pull-abortable": "^4.1.0",
     "pull-handshake": "^1.1.4",
     "pull-stream": "^3.5.1",
