@@ -15,33 +15,34 @@ const createListener = require('./listener')
 class Dialer {
   /**
    * Creates an instance of Dialer.
+   *
    * @param {Swarm} swarm - the swarm
    * @param {any} options - config options
    *
    * @memberOf Dialer
    */
   constructor (swarm, options) {
-    options = options || {}
+    this.options = options || {}
 
     this.swarm = swarm
     this.dialer = null
     this.utils = utilsFactory(swarm)
+    this.peerInfo = this.swarm._peerInfo
 
     // get all the relay addresses for this swarm
-    const relays = this.filter(swarm._peerInfo.multiaddrs.toArray())
+    const relays = this.filter(this.peerInfo.multiaddrs.toArray())
 
     // if no explicit relays, add a default relay addr
     if (relays.length === 0) {
-      this.swarm
-        ._peerInfo
+      this.peerInfo
         .multiaddrs
-        .add(`/p2p-circuit/ipfs/${this.swarm._peerInfo.id.toB58String()}`)
+        .add(`/p2p-circuit/ipfs/${this.peerInfo.id.toB58String()}`)
     }
 
     // TODO: add flag for other types of dealers, ie telescope
     this.dialer = new OnionDialer(swarm, options)
 
-    this.swarm.on('peer-mux-established', this.dialer.dialRelay.bind(this.dialer))
+    this.swarm.on('peer-mux-established', this.dialer.canHop.bind(this.dialer))
     this.swarm.on('peer-mux-closed', (peerInfo) => {
       this.dialer.relayPeers.delete(peerInfo.id.toB58String())
     })

@@ -1,6 +1,5 @@
 'use strict'
 
 module.exports = {
-  hop: '/ipfs/relay/circuit/1.0.0/hop',
-  stop: '/ipfs/relay/circuit/1.0.0/stop'
+  relay: '/libp2p/circuit/relay/0.1.0'
 }

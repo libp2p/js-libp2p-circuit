@@ -5,13 +5,13 @@ const Dialer = require('../src/circuit/dialer')
 const nodes = require('./fixtures/nodes')
 const Connection = require('interface-connection').Connection
 const multiaddr = require('multiaddr')
-const constants = require('../src/circuit/constants')
 const handshake = require('pull-handshake')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const waterfall = require('async/waterfall')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
+const proto = require('../src/protocol')
 
 const sinon = require('sinon')
 const expect = require('chai').expect
@@ -32,7 +32,7 @@ describe('dialer tests', function () {
       dialer.negotiateRelay.reset()
     })
 
-    it(`negotiate a relay on all available relays`, function (done) {
+    it(`negotiate a circuit on all available relays`, function (done) {
       const dstMa = multiaddr(`/ipfs/${nodes.node4.id}`)
       dialer.negotiateRelay.callsFake(function (conn, dstMa, callback) {
         if (conn === dialer.relayPeers.get(nodes.node3.id)) {
@@ -105,9 +105,12 @@ describe('dialer tests', function () {
 
     it(`write the correct dst addr`, function (done) {
       lp.decodeFromReader(shake, (err, msg) => {
-        shake.write(new Buffer(String(constants.RESPONSE.SUCCESS)))
+        shake.write(proto.CircuitRelay.encode({
+          type: proto.CircuitRelay.Type.STATUS,
+          code: proto.CircuitRelay.Status.SUCCESS
+        }))
         expect(err).to.be.null
-        expect(msg.toString()).to.be.equal(`${dstMa.toString()}`)
+        expect(proto.CircuitRelay.decode(msg).dstPeer.addrs.toString()).to.be.equal(`${dstMa.toString()}`)
         done()
       })
     })
@@ -116,7 +119,7 @@ describe('dialer tests', function () {
       callback.callsFake((err, msg) => {
         expect(err).to.not.be.null
         expect(err).to.be.an.instanceOf(Error)
-        expect(err.message).to.be.equal(`Got 500 error code trying to dial over relay`)
+        expect(err.message).to.be.equal(`Got 101 error code trying to dial over relay`)
         expect(callback.calledOnce).to.be.ok
         done()
       })
@@ -125,7 +128,10 @@ describe('dialer tests', function () {
         if (err) return done(err)
 
         pull(
-          pull.values([Buffer.from(String(500))]), // send arbitrary non 200 code
+          pull.values([proto.CircuitRelay.encode({
+            type: proto.CircuitRelay.Type.STATUS,
+            code: proto.CircuitRelay.Status.INVALID_MSG_TYPE
+          })]), // send arbitrary non 200 code
           lp.encode(),
           pull.collect((err, encoded) => {
             expect(err).to.be.null

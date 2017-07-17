@@ -8,20 +8,18 @@ const debug = require('debug')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const EE = require('events').EventEmitter
-const multiaddr = require('multiaddr')
 const constants = require('./constants')
 const once = require('once')
 const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
-const waterfall = require('async/waterfall')
 const assignInWith = require('lodash/assignInWith')
+const proto = require('../protocol')
 
 const multicodec = require('./../multicodec')
 
 const log = debug('libp2p:swarm:circuit:relay')
 log.err = debug('libp2p:swarm:circuit:error:relay')
 
-let utils
 class Hop extends EE {
   /**
    * Construct a Circuit object
@@ -30,10 +28,14 @@ class Hop extends EE {
    * either start a relay or hand the relayed connection to
    * the swarm
    *
-   * @param {any} options - configuration for Relay
+   * @param {Swarm} swarm
+   * @param {Object} options
    */
-  constructor (options) {
+  constructor (swarm, options) {
     super()
+    this.swarm = swarm
+    this.peerInfo = this.swarm._peerInfo
+    this.utils = utilsFactory(swarm)
     this.config = assignInWith(
       {
         active: false,
@@ -44,138 +46,69 @@ class Hop extends EE {
         typeof src === 'undefined' ? false : src
       })
 
-    this.swarm = null
     this.active = this.config.active
   }
 
-  _writeErr (streamHandler, errCode, cb) {
-    errCode = String(errCode)
-    setImmediate(() => this.emit('circuit:error', errCode))
-    streamHandler.write([Buffer.from(errCode)])
-    return cb(errCode)
-  }
-
-  _readSrcAddr (streamHandler, cb) {
-    streamHandler.read((err, srcMa) => {
-      if (err) {
-        log.err(err)
-
-        // TODO: pull-length-prefixed should probably return an `Error` object with an error code
-        if (typeof err === 'string' && err.includes('size longer than max permitted length of')) {
-          return this._writeErr(streamHandler, constants.RESPONSE.HOP.SRC_ADDR_TOO_LONG, cb)
-        }
-      }
-
-      try {
-        srcMa = multiaddr(srcMa.toString()) // read the src multiaddr
-      } catch (err) {
-        return this._writeErr(streamHandler, constants.RESPONSE.HOP.SRC_MULTIADDR_INVALID, cb)
-      }
-
-      cb(null, srcMa)
-    })
-  }
-
-  _readDstAddr (streamHandler, cb) {
-    streamHandler.read((err, dstMa) => {
-      if (err) {
-        log.err(err)
-
-        // TODO: pull-length-prefixed should probably return an `Error` object with an error code
-        if (typeof err === 'string' && err.includes('size longer than max permitted length of')) {
-          return this._writeErr(streamHandler, constants.RESPONSE.HOP.DST_ADDR_TOO_LONG, cb)
-        }
-      }
-
-      try {
-        dstMa = multiaddr(dstMa.toString()) // read the src multiaddr
-      } catch (err) {
-        return this._writeErr(streamHandler, constants.RESPONSE.HOP.DST_MULTIADDR_INVALID, cb)
-      }
-
-      if (dstMa.getPeerId() === this.swarm._peerInfo.id.toB58String()) {
-        return this._writeErr(streamHandler, constants.RESPONSE.HOP.CANT_CONNECT_TO_SELF, cb)
-      }
-
-      cb(null, dstMa)
-    })
-  }
-
   /**
-   * Mount the relay
+   * Handle the relay message
    *
-   * @param {swarm} swarm
-   * @return {void}
+   * @param {CircuitRelay} message
+   * @param {StreamHandler} streamHandler
+   * @returns {*}
    */
-  mount (swarm) {
+  handle (message, streamHandler) {
     if (!this.config.enabled) {
-      return
+      return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.HOP_CANT_SPEAK_RELAY)
     }
 
-    this.swarm = swarm
-    utils = utilsFactory(swarm)
-    this.swarm.handle(multicodec.hop, (proto, conn) => {
-      const streamHandler = new StreamHandler(conn, 1000 * 60)
-      waterfall([
-        (cb) => this._readDstAddr(streamHandler, (err, dstMa) => {
-          if (err) {
-            return cb(err)
-          }
+    if (message.type === proto.CircuitRelay.Type.CAN_HOP) {
+      return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.SUCCESS)
+    }
 
-          if (!this.active && !utils.isPeerConnected(dstMa.getPeerId())) {
-            return this._writeErr(streamHandler, constants.RESPONSE.HOP.NO_CONN_TO_DST, cb)
-          }
+    if (message.dstPeer.id === this.peerInfo.id.toB58String()) {
+      return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
+    }
 
-          cb(null, dstMa)
-        }),
-        (dstMa, cb) => {
-          this._readSrcAddr(streamHandler, (err, srcMa) => {
-            cb(err, dstMa, srcMa)
-          })
+    this.utils.validateMsg(message, streamHandler, proto.CircuitRelay.Type.HOP, (err) => {
+      if (err) {
+        return log(err)
+      }
+
+      return this._circuit(streamHandler.rest(), message, (err) => {
+        if (err) {
+          log.err(err)
+          setImmediate(() => this.emit('circuit:error', err))
         }
-      ], (err, dstMa, srcMa) => {
-        if (err || (!dstMa || !srcMa)) {
-          log.err(`Error handling incoming relay request`, err)
-          return
-        }
-
-        return this._circuit(streamHandler.rest(), dstMa, srcMa, (err) => {
-          if (err) {
-            log.err(err)
-            setImmediate(() => this.emit('circuit:error', err))
-          }
-          setImmediate(() => this.emit('circuit:success'))
-        })
+        setImmediate(() => this.emit('circuit:success'))
       })
     })
-
-    this.emit('mounted')
   }
 
   /**
    * The handler called to process a connection
    *
    * @param {Connection} conn
-   * @param {Multiaddr} dstAddr
-   * @param {Multiaddr} srcAddr
+   * @param {CircuitRelay} message
    * @param {Function} cb
-   *
-   * @return {void}
+   * @returns {*}
+   * @private
    */
-  _circuit (conn, dstAddr, srcAddr, cb) {
-    this._dialPeer(dstAddr, (err, dstConn) => {
+  _circuit (conn, message, cb) {
+    this._dialPeer(message.dstPeer, (err, dstConn) => {
       if (err) {
-        const errStreamHandler = new StreamHandler(conn, 1000 * 60)
+        const errStreamHandler = new StreamHandler(conn)
         this._writeErr(errStreamHandler, constants.RESPONSE.CANT_DIAL_DST)
         pull(pull.empty(), errStreamHandler.rest())
         log.err(err)
         return cb(err)
       }
 
-      const streamHandler = new StreamHandler(dstConn, 1000 * 60)
-      streamHandler.write([new Buffer(srcAddr.toString())], (err) => {
+      const streamHandler = new StreamHandler(dstConn)
+      const stopMsg = Object.assign({}, message)
+      stopMsg.type = proto.CircuitRelay.Type.STOP
+      streamHandler.write(proto.CircuitRelay.encode(stopMsg), (err) => {
         if (err) {
-          const errStreamHandler = new StreamHandler(conn, 1000 * 60)
+          const errStreamHandler = new StreamHandler(conn)
           this._writeErr(errStreamHandler, constants.RESPONSE.CANT_OPEN_DST_STREAM)
           pull(pull.empty(), errStreamHandler.rest())
 
@@ -198,15 +131,15 @@ class Hop extends EE {
   /**
    * Dial the dest peer and create a circuit
    *
-   * @param {Multiaddr} ma
+   * @param {Multiaddr} dstPeer
    * @param {Function} callback
    * @returns {Function|void}
    * @private
    */
-  _dialPeer (ma, callback) {
-    const peerInfo = new PeerInfo(PeerId.createFromB58String(ma.getPeerId()))
-    peerInfo.multiaddrs.add(ma)
-    this.swarm.dial(peerInfo, multicodec.stop, once((err, conn) => {
+  _dialPeer (dstPeer, callback) {
+    const peerInfo = new PeerInfo(PeerId.createFromB58String(dstPeer.id))
+    dstPeer.addrs.forEach((a) => peerInfo.multiaddrs.add(a.toString()))
+    this.swarm.dial(peerInfo, multicodec.relay, once((err, conn) => {
       if (err) {
         log.err(err)
         return callback(err)

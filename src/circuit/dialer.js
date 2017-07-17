@@ -1,11 +1,8 @@
 'use strict'
 
-const Buffer = require('safe-buffer').Buffer
-
 const Connection = require('interface-connection').Connection
 const isFunction = require('lodash.isfunction')
 const multiaddr = require('multiaddr')
-const constants = require('./constants')
 const once = require('once')
 const waterfall = require('async/waterfall')
 const utilsFactory = require('./utils')
@@ -16,6 +13,7 @@ const log = debug('libp2p:circuit:dialer')
 log.err = debug('libp2p:circuit:error:dialer')
 
 const multicodec = require('../multicodec')
+const proto = require('../protocol')
 
 class Dialer {
   /**
@@ -110,49 +108,91 @@ class Dialer {
   negotiateRelay (relay, dstMa, callback) {
     dstMa = multiaddr(dstMa)
 
-    // TODO: whats the best addr to send? First one seems as good as any.
-    const srcMa = this.swarm._peerInfo.multiaddrs.toArray()[0]
-    const relayConn = new Connection()
-
-    let streamHandler = null
+    const srcMas = this.swarm._peerInfo.multiaddrs.toArray()
     waterfall([
       (cb) => {
         if (relay instanceof Connection) {
-          return cb(null, relay)
+          return cb(null, new StreamHandler(relay))
         }
         return this.dialRelay(this.utils.peerInfoFromMa(relay), cb)
       },
-      (conn, cb) => {
+      (streamHandler, cb) => {
         log(`negotiating relay for peer ${dstMa.getPeerId()}`)
-        streamHandler = new StreamHandler(conn, 1000 * 60)
-        streamHandler.write([
-          new Buffer(dstMa.toString()),
-          new Buffer(srcMa.toString())
-        ], (err) => {
-          if (err) {
-            log.err(err)
-            return cb(err)
-          }
+        streamHandler.write(
+          proto.CircuitRelay.encode({
+            type: proto.CircuitRelay.Type.HOP,
+            srcPeer: {
+              id: this.swarm._peerInfo.id.toB58String(),
+              addrs: srcMas.map((addr) => addr.toString())
+            },
+            dstPeer: {
+              id: dstMa.getPeerId(),
+              addrs: [dstMa.toString()]
+            }
+          }),
+          (err) => {
+            if (err) {
+              log.err(err)
+              return cb(err)
+            }
 
-          cb(null)
-        })
+            cb(null, streamHandler)
+          })
       },
-      (cb) => {
+      (streamHandler, cb) => {
         streamHandler.read((err, msg) => {
           if (err) {
             log.err(err)
             return cb(err)
           }
 
-          if (Number(msg.toString()) !== constants.RESPONSE.SUCCESS) {
-            return cb(new Error(`Got ${msg.toString()} error code trying to dial over relay`))
+          const message = proto.CircuitRelay.decode(msg)
+          if (message.type !== proto.CircuitRelay.Type.STATUS) {
+            return cb(new Error(`Got invalid message type - ` +
+              `expected ${proto.CircuitRelay.Type.STATUS} got ${message.type}`))
           }
 
-          relayConn.setInnerConn(streamHandler.rest())
-          cb(null, relayConn)
+          if (message.code !== proto.CircuitRelay.Status.SUCCESS) {
+            return cb(new Error(`Got ${message.code} error code trying to dial over relay`))
+          }
+
+          cb(null, new Connection(streamHandler.rest()))
         })
       }
     ], callback)
+  }
+
+  /**
+   * Does the peer support the HOP protocol
+   *
+   * @param {PeerInfo} peer
+   * @param {Function} cb
+   * @returns {*}
+   */
+  canHop (peer, cb) {
+    cb = once(cb || (() => {}))
+
+    if (!this.relayPeers.get(this.utils.getB58String(peer))) {
+      return this.dialRelay(peer, (err, streamHandler) => {
+        if (err) {
+          return log.err(err)
+        }
+
+        streamHandler.write(proto.CircuitRelay.encode({
+          type: proto.CircuitRelay.Type.CAN_HOP
+        }), (err) => {
+          if (err) {
+            log.err(err)
+            return cb(err)
+          }
+
+          this.relayPeers.set(this.utils.getB58String(peer), peer)
+          cb(null)
+        })
+      })
+    }
+
+    return cb()
   }
 
   /**
@@ -170,15 +210,14 @@ class Dialer {
     const relayConn = new Connection()
     relayConn.setPeerInfo(peer)
     // attempt to dia the relay so that we have a connection
-    this.swarm.dial(peer, multicodec.hop, once((err, conn) => {
+    this.swarm.dial(peer, multicodec.relay, once((err, conn) => {
       if (err) {
         log.err(err)
         return cb(err)
       }
 
       relayConn.setInnerConn(conn)
-      this.relayPeers.set(this.utils.getB58String(peer), peer)
-      cb(null, relayConn)
+      cb(null, new StreamHandler(conn))
     }))
   }
 }
