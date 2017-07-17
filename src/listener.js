@@ -7,21 +7,57 @@ const EE = require('events').EventEmitter
 const multiaddr = require('multiaddr')
 const mafmt = require('mafmt')
 const Stop = require('./circuit/stop')
+const Hop = require('./circuit/hop')
+const proto = require('./protocol')
+const utilsFactory = require('./circuit/utils')
+
+const StreamHandler = require('./circuit/stream-handler')
 
 const debug = require('debug')
 
 const log = debug('libp2p:circuit:listener')
 log.err = debug('libp2p:circuit:error:listener')
 
-module.exports = (swarm, options, handler) => {
+module.exports = (swarm, options, connHandler) => {
   const listener = new EE()
-  const stopHandler = new Stop(swarm)
+  const utils = utilsFactory(swarm)
+
+  listener.stopHandler = new Stop(swarm)
+  listener.hopHandler = new Hop(swarm, options.circuit)
 
   listener.listen = (ma, callback) => {
     callback = callback || (() => {})
 
-    swarm.handle(multicodec.stop, (proto, conn) => {
-      stopHandler.handle(conn, handler)
+    swarm.handle(multicodec.relay, (relayProto, conn) => {
+      const streamHandler = new StreamHandler(conn)
+      streamHandler.read((err, msg) => {
+        if (err) {
+          log.err(err)
+          return
+        }
+
+        let request = null
+        try {
+          request = proto.CircuitRelay.decode(msg)
+        } catch (err) {
+          return utils.writeResponse(streamHandler, proto.CircuitRelay.Status.INVALID_MSG_TYPE)
+        }
+
+        switch (request.type) {
+          case proto.CircuitRelay.Type.CAN_HOP:
+          case proto.CircuitRelay.Type.HOP: {
+            return listener.hopHandler.handle(request, streamHandler)
+          }
+
+          case proto.CircuitRelay.Type.STOP: {
+            return listener.stopHandler.handle(request, streamHandler, connHandler)
+          }
+
+          default: {
+            return utils.writeResponse(streamHandler, proto.CircuitRelay.Status.INVALID_MSG_TYPE)
+          }
+        }
+      })
     })
 
     setImmediate(() => listener.emit('listen'))

@@ -141,7 +141,7 @@ class OnionDialer extends Dialer {
    */
   _handshake (pi, conn, cb) {
     const proxyConn = new Connection()
-    const handler = this.swarm.connHandler(pi, multicodec.hop, proxyConn)
+    const handler = this.swarm.connHandler(pi, multicodec.relay, proxyConn)
     handler.handleNew(conn, (err, upgradedConn) => {
       if (err) {
         log.err(err)

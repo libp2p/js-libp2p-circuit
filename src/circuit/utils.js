@@ -3,6 +3,7 @@
 const multiaddr = require('multiaddr')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
+const proto = require('../protocol')
 
 module.exports = function (swarm) {
   /**
@@ -66,9 +67,63 @@ module.exports = function (swarm) {
     return swarm.muxedConns[peerId] || swarm.conns[peerId]
   }
 
+  /**
+   * Write a response
+   *
+   * @param {StreamHandler} streamHandler
+   * @param {CircuitRelay.Status} status
+   * @param {Function} cb
+   * @returns {*}
+   */
+  function writeResponse (streamHandler, status, cb) {
+    cb = cb || (() => {})
+    streamHandler.write(proto.CircuitRelay.encode({
+      type: proto.CircuitRelay.Type.STATUS,
+      code: status
+    }))
+    return cb(status)
+  }
+
+  /**
+   * Validate incomming HOP/STOP message
+   *
+   * @param {CircuitRelay} msg
+   * @param {StreamHandler} streamHandler
+   * @param {CircuitRelay.Type} type
+   * @returns {*}
+   * @param {Function} cb
+   */
+  function validateMsg (msg, streamHandler, type, cb) {
+    try {
+      msg.dstPeer.addrs.forEach((addr) => {
+        return multiaddr(addr.toString())
+      })
+    } catch (err) {
+      writeResponse(streamHandler, type === proto.CircuitRelay.Type.HOP
+        ? proto.CircuitRelay.Status.HOP_DST_MULTIADDR_INVALID
+        : proto.CircuitRelay.Status.STOP_DST_MULTIADDR_INVALID)
+      return cb(err)
+    }
+
+    try {
+      msg.srcPeer.addrs.forEach((addr) => {
+        return multiaddr(addr.toString())
+      })
+    } catch (err) {
+      writeResponse(streamHandler, type === proto.CircuitRelay.Type.HOP
+        ? proto.CircuitRelay.Status.HOP_SRC_MULTIADDR_INVALID
+        : proto.CircuitRelay.Status.STOP_SRC_MULTIADDR_INVALID)
+      return cb(err)
+    }
+
+    return cb(null)
+  }
+
   return {
     getB58String: getB58String,
     peerInfoFromMa: peerInfoFromMa,
-    isPeerConnected: isPeerConnected
+    isPeerConnected: isPeerConnected,
+    validateMsg: validateMsg,
+    writeResponse: writeResponse
   }
 }

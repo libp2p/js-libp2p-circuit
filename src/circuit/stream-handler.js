@@ -20,7 +20,7 @@ class StreamHandler {
     this.conn = conn
     this.stream = null
     this.shake = null
-    this.maxLength = maxLength || 1024
+    this.maxLength = maxLength || 4096
 
     this.stream = handshake({timeout: timeout || 1000 * 60})
     this.shake = this.stream.handshake
@@ -69,18 +69,28 @@ class StreamHandler {
     }
 
     pull(
-      pull.values(msg),
+      pull.values([msg]),
       lp.encode(),
       pull.collect((err, encoded) => {
         if (err) {
           log.err(err)
           this.shake.abort(err)
+          return cb(err)
         }
 
         encoded.forEach((e) => this.shake.write(e))
         cb()
       })
     )
+  }
+
+  /**
+   * Get the raw Connection
+   *
+   * @returns {null|Connection|*}
+   */
+  getRawConn () {
+    return this.conn
   }
 
   /**

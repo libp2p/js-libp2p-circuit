@@ -4,14 +4,12 @@
 const Stop = require('../src/circuit/stop')
 const nodes = require('./fixtures/nodes')
 const Connection = require('interface-connection').Connection
-const constants = require('../src/circuit/constants')
 const handshake = require('pull-handshake')
 const waterfall = require('async/waterfall')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
-const lp = require('pull-length-prefixed')
-const pull = require('pull-stream')
-const longaddr = require('./fixtures/long-address')
+const StreamHandler = require('../src/circuit/stream-handler')
+const proto = require('../src/protocol')
 
 const expect = require('chai').expect
 
@@ -22,11 +20,9 @@ describe('stop', function () {
     let swarm
     let conn
     let stream
-    let shake
 
     beforeEach(function (done) {
       stream = handshake({timeout: 1000 * 60})
-      shake = stream.handshake
       conn = new Connection(stream)
       conn.setPeerInfo(new PeerInfo(PeerId.createFromB58String('QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE')))
 
@@ -49,57 +45,37 @@ describe('stop', function () {
     })
 
     it(`handle a valid request`, function (done) {
-      pull(
-        pull.values([Buffer.from(`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`)]),
-        lp.encode(),
-        pull.collect((err, encoded) => {
-          expect(err).to.be.null
-
-          shake.write(encoded[0])
-          lp.decodeFromReader(shake, (err, msg) => {
-            expect(err).to.be.null
-            expect(msg.toString()).to.equal(String(constants.RESPONSE.SUCCESS))
-            done()
-          })
-        })
-      )
-      stopHandler.handle(conn)
+      stopHandler.handle({
+        type: proto.CircuitRelay.Type.STOP,
+        srcPeer: {
+          id: `QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`,
+          addrs: [`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`]
+        },
+        dstPeer: {
+          id: `QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`,
+          addrs: [`/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`]
+        }
+      }, new StreamHandler(conn), (conn) => {
+        expect(conn).to.be.not.null
+        done()
+      })
     })
 
     it(`handle request with invalid multiaddress`, function (done) {
-      pull(
-        pull.values([Buffer.from(`sdfsddfds`)]),
-        lp.encode(),
-        pull.collect((err, encoded) => {
-          expect(err).to.be.null
-
-          shake.write(encoded[0])
-          lp.decodeFromReader(shake, (err, msg) => {
-            expect(err).to.be.null
-            expect(msg.toString()).to.equal(String(constants.RESPONSE.STOP.SRC_MULTIADDR_INVALID))
-            done()
-          })
-        })
-      )
-      stopHandler.handle(conn)
-    })
-
-    it(`handle request with a long multiaddress`, function (done) {
-      pull(
-        pull.values([longaddr]),
-        lp.encode(),
-        pull.collect((err, encoded) => {
-          expect(err).to.be.null
-
-          shake.write(encoded[0])
-          lp.decodeFromReader(shake, (err, msg) => {
-            expect(err).to.be.null
-            expect(msg.toString()).to.equal(String(constants.RESPONSE.STOP.SRC_ADDR_TOO_LONG))
-            done()
-          })
-        })
-      )
-      stopHandler.handle(conn)
+      stopHandler.handle({
+        type: proto.CircuitRelay.Type.STOP,
+        srcPeer: {
+          id: `QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`,
+          addrs: [`dsfsdfsdf`]
+        },
+        dstPeer: {
+          id: `QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`,
+          addrs: [`sdflksdfndsklfnlkdf`]
+        }
+      }, new StreamHandler(conn), (err, conn) => {
+        expect(err).to.be.not.null
+        done()
+      })
     })
   })
 })

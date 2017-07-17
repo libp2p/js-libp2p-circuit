@@ -11,39 +11,32 @@ describe('protocol', function () {
 
   before(() => {
     msgObject = {
-      version: '1.0.0',
-      message: {
-        type: proto.Circuit.MessageType.HOP,
-        source: {
-          id: 'QmSource',
-          address: [
-            '/p2p-circuit/ipfs/QmSource',
-            '/p2p-circuit/ipv4/0.0.0.0/9000/ipfs/QmSource',
-            'ipv4/0.0.0.0/9000/ipfs/QmSource'
-          ]
-        },
-        dest: {
-          id: 'QmDest',
-          address: [
-            '/p2p-circuit/ipfs/QmDest',
-            '/p2p-circuit/ipv4/1.1.1.1/9000/ipfs/QmDest',
-            'ipv4/1.1.1.1/9000/ipfs/QmDest'
-          ]
-        }
+      type: proto.CircuitRelay.Type.HOP,
+      srcPeer: {
+        id: 'QmSource',
+        addrs: [
+          '/p2p-circuit/ipfs/QmSource',
+          '/p2p-circuit/ipv4/0.0.0.0/9000/ipfs/QmSource',
+          'ipv4/0.0.0.0/9000/ipfs/QmSource'
+        ]
+      },
+      dstPeer: {
+        id: 'QmDest',
+        addrs: [
+          '/p2p-circuit/ipfs/QmDest',
+          '/p2p-circuit/ipv4/1.1.1.1/9000/ipfs/QmDest',
+          'ipv4/1.1.1.1/9000/ipfs/QmDest'
+        ]
       }
     }
 
-    let buff = proto.Circuit.encode(msgObject)
-    message = proto.Circuit.decode(buff)
-  })
-
-  it(`version should match`, () => {
-    expect(message.version).to.equal('1.0.0')
+    let buff = proto.CircuitRelay.encode(msgObject)
+    message = proto.CircuitRelay.decode(buff)
   })
 
   it(`should source and dest`, () => {
-    expect(message.message.source).to.not.be.null
-    expect(message.message.dest).to.not.be.null
+    expect(message.srcPeer).to.not.be.null
+    expect(message.dstPeer).to.not.be.null
   })
 
   it(`should encode message`, () => {
