@@ -29,22 +29,12 @@ class Stop extends EE {
         return log(err)
       }
 
-      streamHandler.write(proto.CircuitRelay.encode({
-        type: proto.CircuitRelay.Type.STATUS,
-        code: proto.CircuitRelay.Status.SUCCESS
-      }), (err) => {
-        if (err) {
-          log.err(err)
-          return callback(err)
-        }
-
-        const peerInfo = new PeerInfo(message.srcPeer.id)
-        message.srcPeer.addrs.forEach((addr) => peerInfo.multiaddrs.add(addr.toString()))
-        const newConn = new Connection(streamHandler.rest())
-        newConn.setPeerInfo(peerInfo)
-        setImmediate(() => this.emit('connection', newConn))
-        callback(newConn)
-      })
+      const peerInfo = new PeerInfo(message.srcPeer.id)
+      message.srcPeer.addrs.forEach((addr) => peerInfo.multiaddrs.add(addr.toString()))
+      const newConn = new Connection(streamHandler.rest())
+      newConn.setPeerInfo(peerInfo)
+      setImmediate(() => this.emit('connection', newConn))
+      callback(newConn)
     })
   }
 }

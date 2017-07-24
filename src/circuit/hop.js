@@ -103,27 +103,39 @@ class Hop extends EE {
         return cb(err)
       }
 
-      const streamHandler = new StreamHandler(dstConn)
-      const stopMsg = Object.assign({}, message)
-      stopMsg.type = proto.CircuitRelay.Type.STOP
-      streamHandler.write(proto.CircuitRelay.encode(stopMsg), (err) => {
+      const srcStreamHandler = new StreamHandler(conn)
+      srcStreamHandler.write(proto.CircuitRelay.encode({
+        type: proto.CircuitRelay.Type.STATUS,
+        code: proto.CircuitRelay.Status.SUCCESS
+      }), (err) => {
         if (err) {
-          const errStreamHandler = new StreamHandler(conn)
-          this._writeErr(errStreamHandler, constants.RESPONSE.CANT_OPEN_DST_STREAM)
-          pull(pull.empty(), errStreamHandler.rest())
-
           log.err(err)
           return cb(err)
         }
 
-        // circuit the src and dst streams
-        pull(
-          conn,
-          streamHandler.rest(),
-          conn
-        )
+        const streamHandler = new StreamHandler(dstConn)
+        const stopMsg = Object.assign({}, message)
+        stopMsg.type = proto.CircuitRelay.Type.STOP
+        streamHandler.write(proto.CircuitRelay.encode(stopMsg), (err) => {
+          if (err) {
+            const errStreamHandler = new StreamHandler(conn)
+            this._writeErr(errStreamHandler, constants.RESPONSE.CANT_OPEN_DST_STREAM)
+            pull(pull.empty(), errStreamHandler.rest())
 
-        cb()
+            log.err(err)
+            return cb(err)
+          }
+
+          const srcConn = srcStreamHandler.rest()
+          // circuit the src and dst streams
+          pull(
+            srcConn,
+            streamHandler.rest(),
+            srcConn
+          )
+
+          cb()
+        })
       })
     })
   }
