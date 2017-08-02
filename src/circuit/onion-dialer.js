@@ -43,7 +43,7 @@ class OnionDialer extends Dialer {
       }
     }
 
-    let dstConn = new Connection()
+    const dstConn = new Connection()
     setImmediate(this._onionDial.bind(this), maddrs, (err, conn) => {
       if (err) {
         log.err(err)

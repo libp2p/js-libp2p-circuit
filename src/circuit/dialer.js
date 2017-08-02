@@ -40,7 +40,17 @@ class Dialer {
    * @memberOf Dialer
    */
   dial (ma, cb) {
-    this.dialPeer(multiaddr(ma), cb)
+    const dstConn = new Connection()
+    setImmediate(this.dialPeer.bind(this), multiaddr(ma), (err, conn) => {
+      if (err) {
+        log.err(err)
+        return cb(err)
+      }
+      dstConn.setInnerConn(conn)
+      cb(null, dstConn)
+    })
+
+    return dstConn
   }
 
   /**

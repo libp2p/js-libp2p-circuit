@@ -3,7 +3,7 @@
 const mafmt = require('mafmt')
 const multiaddr = require('multiaddr')
 
-// const OnionDialer = require('./circuit/onion-dialer')
+const OnionDialer = require('./circuit/onion-dialer')
 const CircuitDialer = require('./circuit/dialer')
 const utilsFactory = require('./circuit/utils')
 
@@ -41,7 +41,11 @@ class Dialer {
     }
 
     // TODO: add flag for other types of dealers, ie telescope
-    this.dialer = new CircuitDialer(swarm, options)
+    if (options.dialer === 'onion') {
+      this.dialer = new OnionDialer(swarm, options)
+    } else {
+      this.dialer = new CircuitDialer(swarm, options)
+    }
 
     this.swarm.on('peer-mux-established', this.dialer.canHop.bind(this.dialer))
     this.swarm.on('peer-mux-closed', (peerInfo) => {
