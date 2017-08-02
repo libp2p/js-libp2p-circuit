@@ -34,14 +34,27 @@ class Dialer {
    * Dial a peer over a relay
    *
    * @param {multiaddr} ma - the multiaddr of the peer to dial
-   * @param {Object} options - dial options
    * @param {Function} cb - a callback called once dialed
    * @returns {Connection} - the connection
    *
    * @memberOf Dialer
    */
-  dial (ma, options, cb) {
-    throw new Error('abstract class, method not implemented')
+  dial (ma, cb) {
+    const addr = ma.toString().split('p2p-circuit')
+    const relay = addr[0] === '/' ? null : multiaddr(addr[0])
+    const peer = multiaddr(addr[1] || addr[0])
+
+    const dstConn = new Connection()
+    setImmediate(this.dialPeer.bind(this), peer, relay, (err, conn) => {
+      if (err) {
+        log.err(err)
+        return cb(err)
+      }
+      dstConn.setInnerConn(conn)
+      cb(null, dstConn)
+    })
+
+    return dstConn
   }
 
   /**
@@ -186,8 +199,22 @@ class Dialer {
             return cb(err)
           }
 
-          this.relayPeers.set(this.utils.getB58String(peer), peer)
-          cb(null)
+          streamHandler.read((err, msg) => {
+            if (err) {
+              log.err(err)
+              return cb(err)
+            }
+
+            const response = proto.CircuitRelay.decode(msg)
+
+            if (response.code !== proto.CircuitRelay.Status.SUCCESS) {
+              return log(`HOP not supported, skipping - ${this.utils.getB58String(peer)}`)
+            }
+
+            log(`HOP supported adding as relay - ${this.utils.getB58String(peer)}`)
+            this.relayPeers.set(this.utils.getB58String(peer), peer)
+            cb(null)
+          })
         })
       })
     }
