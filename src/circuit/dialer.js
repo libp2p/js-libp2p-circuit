@@ -41,7 +41,7 @@ class Dialer {
    * @memberOf Dialer
    */
   dial (ma, options, cb) {
-    throw new Error('abstract class, method not implemented')
+    this.swarm.dial(ma, cb)
   }
 
   /**
@@ -186,8 +186,22 @@ class Dialer {
             return cb(err)
           }
 
-          this.relayPeers.set(this.utils.getB58String(peer), peer)
-          cb(null)
+          streamHandler.read((err, msg) => {
+            if (err) {
+              log.err(err)
+              return cb(err)
+            }
+
+            const response = proto.CircuitRelay.decode(msg)
+
+            if (response.code !== proto.CircuitRelay.Status.SUCCESS) {
+              return log(`HOP not supported, skipping - ${this.utils.getB58String(peer)}`)
+            }
+
+            log(`HOP supported adding as relay - ${this.utils.getB58String(peer)}`)
+            this.relayPeers.set(this.utils.getB58String(peer), peer)
+            cb(null)
+          })
         })
       })
     }
