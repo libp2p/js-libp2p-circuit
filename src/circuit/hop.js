@@ -8,7 +8,6 @@ const debug = require('debug')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const EE = require('events').EventEmitter
-const constants = require('./constants')
 const once = require('once')
 const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
@@ -97,7 +96,7 @@ class Hop extends EE {
     this._dialPeer(message.dstPeer, (err, dstConn) => {
       if (err) {
         const errStreamHandler = new StreamHandler(conn)
-        this._writeErr(errStreamHandler, constants.RESPONSE.CANT_DIAL_DST)
+        this.utils.writeResponse(errStreamHandler, proto.CircuitRelay.Status.HOP_CANT_DIAL_DST)
         pull(pull.empty(), errStreamHandler.rest())
         log.err(err)
         return cb(err)
@@ -119,7 +118,7 @@ class Hop extends EE {
         streamHandler.write(proto.CircuitRelay.encode(stopMsg), (err) => {
           if (err) {
             const errStreamHandler = new StreamHandler(conn)
-            this._writeErr(errStreamHandler, constants.RESPONSE.CANT_OPEN_DST_STREAM)
+            this.utils.writeResponse(errStreamHandler, proto.CircuitRelay.Status.HOP_CANT_OPEN_DST_STREAM)
             pull(pull.empty(), errStreamHandler.rest())
 
             log.err(err)

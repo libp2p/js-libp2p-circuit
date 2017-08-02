@@ -34,14 +34,13 @@ class Dialer {
    * Dial a peer over a relay
    *
    * @param {multiaddr} ma - the multiaddr of the peer to dial
-   * @param {Object} options - dial options
    * @param {Function} cb - a callback called once dialed
    * @returns {Connection} - the connection
    *
    * @memberOf Dialer
    */
-  dial (ma, options, cb) {
-    this.swarm.dial(ma, cb)
+  dial (ma, cb) {
+    this.dialPeer(multiaddr(ma), cb)
   }
 
   /**
