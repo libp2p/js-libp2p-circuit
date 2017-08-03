@@ -24,6 +24,7 @@ class Dialer {
    */
   constructor (swarm, options) {
     this.options = options || {}
+    this.options.dialer = 'onion'
 
     this.swarm = swarm
     this.dialer = null
@@ -31,17 +32,17 @@ class Dialer {
     this.peerInfo = this.swarm._peerInfo
 
     // get all the relay addresses for this swarm
-    const relays = this.filter(this.peerInfo.multiaddrs.toArray())
+    this.relays = this.filter(this.peerInfo.multiaddrs.toArray())
 
     // if no explicit relays, add a default relay addr
-    if (relays.length === 0) {
+    if (this.relays.length === 0) {
       this.peerInfo
         .multiaddrs
         .add(`/p2p-circuit/ipfs/${this.peerInfo.id.toB58String()}`)
     }
 
     // TODO: add flag for other types of dealers, ie telescope
-    if (options.dialer === 'onion') {
+    if (this.options.dialer === 'onion') {
       this.dialer = new OnionDialer(swarm, options)
     } else {
       this.dialer = new CircuitDialer(swarm, options)
@@ -51,8 +52,6 @@ class Dialer {
     this.swarm.on('peer-mux-closed', (peerInfo) => {
       this.dialer.relayPeers.delete(peerInfo.id.toB58String())
     })
-
-    this._dialSwarmRelays(relays)
   }
 
   /**
@@ -63,16 +62,14 @@ class Dialer {
    */
   _dialSwarmRelays (relays) {
     // if we have relay addresses in swarm config, then dial those relays
-    this.swarm.on('listening', () => {
-      relays.forEach((relay) => {
-        let relaySegments = relay
-          .toString()
-          .split('/p2p-circuit')
-          .filter(segment => segment.length)
+    this.relays.forEach((relay) => {
+      let relaySegments = relay
+        .toString()
+        .split('/p2p-circuit')
+        .filter(segment => segment.length)
 
-        relaySegments.forEach((relaySegment) => {
-          this.dialer.dialRelay(this.utils.peerInfoFromMa(multiaddr(relaySegment)))
-        })
+      relaySegments.forEach((relaySegment) => {
+        this.dialer.dialRelay(this.utils.peerInfoFromMa(multiaddr(relaySegment)))
       })
     })
   }
@@ -104,7 +101,9 @@ class Dialer {
       options = this.options || {}
     }
 
-    return createListener(this.swarm, options, handler)
+    const listener = createListener(this.swarm, options, handler)
+    listener.on('listen', this._dialSwarmRelays.bind(this))
+    return listener
   }
 
   /**
