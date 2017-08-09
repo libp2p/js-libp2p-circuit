@@ -23,14 +23,14 @@ class Stop extends EE {
   handle (message, streamHandler, callback) {
     callback = callback || (() => {})
 
-    return this.utils.validateMsg(message, streamHandler, proto.CircuitRelay.Type.STOP, (err) => {
+    return this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.STOP, (err) => {
       if (err) {
         callback(err)
         return log(err)
       }
 
       const peerInfo = new PeerInfo(message.srcPeer.id)
-      message.srcPeer.addrs.forEach((addr) => peerInfo.multiaddrs.add(addr.toString()))
+      message.srcPeer.addrs.forEach((addr) => peerInfo.multiaddrs.add(addr))
       const newConn = new Connection(streamHandler.rest())
       newConn.setPeerInfo(peerInfo)
       setImmediate(() => this.emit('connection', newConn))

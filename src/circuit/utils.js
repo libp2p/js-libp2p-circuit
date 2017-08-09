@@ -93,10 +93,10 @@ module.exports = function (swarm) {
    * @returns {*}
    * @param {Function} cb
    */
-  function validateMsg (msg, streamHandler, type, cb) {
+  function validateAddrs (msg, streamHandler, type, cb) {
     try {
       msg.dstPeer.addrs.forEach((addr) => {
-        return multiaddr(addr.toString())
+        return multiaddr(addr)
       })
     } catch (err) {
       writeResponse(streamHandler, type === proto.CircuitRelay.Type.HOP
@@ -107,7 +107,7 @@ module.exports = function (swarm) {
 
     try {
       msg.srcPeer.addrs.forEach((addr) => {
-        return multiaddr(addr.toString())
+        return multiaddr(addr)
       })
     } catch (err) {
       writeResponse(streamHandler, type === proto.CircuitRelay.Type.HOP
@@ -123,7 +123,7 @@ module.exports = function (swarm) {
     getB58String: getB58String,
     peerInfoFromMa: peerInfoFromMa,
     isPeerConnected: isPeerConnected,
-    validateMsg: validateMsg,
+    validateAddrs: validateAddrs,
     writeResponse: writeResponse
   }
 }

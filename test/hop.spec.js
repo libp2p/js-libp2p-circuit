@@ -8,6 +8,7 @@ const handshake = require('pull-handshake')
 const waterfall = require('async/waterfall')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
+const multiaddr = require('multiaddr')
 const lp = require('pull-length-prefixed')
 const proto = require('../src/protocol')
 const StreamHandler = require('../src/circuit/stream-handler')
@@ -59,12 +60,12 @@ describe('relay', function () {
       let relayMsg = {
         type: proto.CircuitRelay.Type.HOP,
         srcPeer: {
-          id: `QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`,
-          addrs: [`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`]
+          id: Buffer.from(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`),
+          addrs: [multiaddr(`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).buffer]
         },
         dstPeer: {
-          id: `QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`,
-          addrs: [`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`]
+          id: Buffer.from(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`),
+          addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
         }
       }
 
@@ -80,12 +81,12 @@ describe('relay', function () {
       let relayMsg = {
         type: proto.CircuitRelay.Type.HOP,
         srcPeer: {
-          id: `QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`,
-          addrs: [`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`]
+          id: Buffer.from(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`),
+          addrs: [multiaddr(`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).buffer]
         },
         dstPeer: {
-          id: `QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`,
-          addrs: [`/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`]
+          id: Buffer.from(`QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`),
+          addrs: [multiaddr(`/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`).buffer]
         }
       }
 
@@ -109,8 +110,8 @@ describe('relay', function () {
           addrs: [`sdfkjsdnfkjdsb`]
         },
         dstPeer: {
-          id: `QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`,
-          addrs: [`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`]
+          id: Buffer.from(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`),
+          addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
         }
       }
 
@@ -130,8 +131,8 @@ describe('relay', function () {
       let relayMsg = {
         type: proto.CircuitRelay.Type.HOP,
         srcPeer: {
-          id: `QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`,
-          addrs: [`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`]
+          id: Buffer.from(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`),
+          addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
         },
         dstPeer: {
           id: `sdfkjsdnfkjdsb`,

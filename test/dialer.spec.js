@@ -110,7 +110,7 @@ describe('dialer tests', function () {
           code: proto.CircuitRelay.Status.SUCCESS
         }))
         expect(err).to.be.null
-        expect(proto.CircuitRelay.decode(msg).dstPeer.addrs.toString()).to.be.equal(`${dstMa.toString()}`)
+        expect(proto.CircuitRelay.decode(msg).dstPeer.addrs[0]).to.deep.equal(dstMa.buffer)
         done()
       })
     })
@@ -119,7 +119,7 @@ describe('dialer tests', function () {
       callback.callsFake((err, msg) => {
         expect(err).to.not.be.null
         expect(err).to.be.an.instanceOf(Error)
-        expect(err.message).to.be.equal(`Got 101 error code trying to dial over relay`)
+        expect(err.message).to.be.equal(`Got 400 error code trying to dial over relay`)
         expect(callback.calledOnce).to.be.ok
         done()
       })
@@ -130,7 +130,7 @@ describe('dialer tests', function () {
         pull(
           pull.values([proto.CircuitRelay.encode({
             type: proto.CircuitRelay.Type.STATUS,
-            code: proto.CircuitRelay.Status.INVALID_MSG_TYPE
+            code: proto.CircuitRelay.Status.MALFORMED_MESSAGE
           })]), // send arbitrary non 200 code
           lp.encode(),
           pull.collect((err, encoded) => {

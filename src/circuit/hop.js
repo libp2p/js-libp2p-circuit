@@ -64,11 +64,15 @@ class Hop extends EE {
       return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.SUCCESS)
     }
 
-    if (message.dstPeer.id === this.peerInfo.id.toB58String()) {
+    if (message.dstPeer.id.toString() === this.peerInfo.id.toB58String()) {
       return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
     }
 
-    this.utils.validateMsg(message, streamHandler, proto.CircuitRelay.Type.HOP, (err) => {
+    if (!message.dstPeer.addrs.length) {
+      message.dstPeer.addrs.push(`/ipfs/${message.dstPeer.id}`)
+    }
+
+    this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.HOP, (err) => {
       if (err) {
         return log(err)
       }
@@ -148,8 +152,8 @@ class Hop extends EE {
    * @private
    */
   _dialPeer (dstPeer, callback) {
-    const peerInfo = new PeerInfo(PeerId.createFromB58String(dstPeer.id))
-    dstPeer.addrs.forEach((a) => peerInfo.multiaddrs.add(a.toString()))
+    const peerInfo = new PeerInfo(PeerId.createFromBytes(dstPeer.id))
+    dstPeer.addrs.forEach((a) => peerInfo.multiaddrs.add(a))
     this.swarm.dial(peerInfo, multicodec.relay, once((err, conn) => {
       if (err) {
         log.err(err)

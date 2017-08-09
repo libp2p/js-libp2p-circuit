@@ -7,6 +7,7 @@ const once = require('once')
 const waterfall = require('async/waterfall')
 const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
+const PeerId = require('peer-id')
 
 const debug = require('debug')
 const log = debug('libp2p:circuit:dialer')
@@ -135,12 +136,12 @@ class Dialer {
           proto.CircuitRelay.encode({
             type: proto.CircuitRelay.Type.HOP,
             srcPeer: {
-              id: this.swarm._peerInfo.id.toB58String(),
-              addrs: srcMas.map((addr) => addr.toString())
+              id: this.swarm._peerInfo.id.id,
+              addrs: srcMas.map((addr) => addr.buffer)
             },
             dstPeer: {
-              id: dstMa.getPeerId(),
-              addrs: [dstMa.toString()]
+              id: PeerId.createFromB58String(dstMa.getPeerId()).id,
+              addrs: [dstMa.buffer]
             }
           }),
           (err) => {

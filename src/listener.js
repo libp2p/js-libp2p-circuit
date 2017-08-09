@@ -40,7 +40,7 @@ module.exports = (swarm, options, connHandler) => {
         try {
           request = proto.CircuitRelay.decode(msg)
         } catch (err) {
-          return utils.writeResponse(streamHandler, proto.CircuitRelay.Status.INVALID_MSG_TYPE)
+          return utils.writeResponse(streamHandler, proto.CircuitRelay.Status.MALFORMED_MESSAGE)
         }
 
         switch (request.type) {
