@@ -13,6 +13,11 @@ log.err = debug('libp2p:circuit:error:transportdialer')
 const createListener = require('./listener')
 
 class Circuit {
+
+  static get tag () {
+    return 'Circuit'
+  }
+
   /**
    * Creates an instance of Dialer.
    *
@@ -23,7 +28,6 @@ class Circuit {
    */
   constructor (swarm, options) {
     this.options = options || {}
-    this.tag = 'Circuit'
 
     this.swarm = swarm
     this.dialer = null

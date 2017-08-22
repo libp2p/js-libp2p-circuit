@@ -241,15 +241,11 @@ class Dialer {
   _dialRelay (peer, cb) {
     cb = once(cb || (() => {}))
 
-    const relayConn = new Connection()
-    relayConn.setPeerInfo(peer)
     this.swarm.dial(peer, multicodec.relay, once((err, conn) => {
       if (err) {
         log.err(err)
         return cb(err)
       }
-
-      relayConn.setInnerConn(conn)
       cb(null, new StreamHandler(conn))
     }))
   }
