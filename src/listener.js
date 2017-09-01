@@ -23,7 +23,7 @@ module.exports = (swarm, options, connHandler) => {
   const utils = utilsFactory(swarm)
 
   listener.stopHandler = new Stop(swarm)
-  listener.hopHandler = new Hop(swarm, options.circuit)
+  listener.hopHandler = new Hop(swarm, options.hop)
 
   listener.listen = (ma, callback) => {
     callback = callback || (() => {})
