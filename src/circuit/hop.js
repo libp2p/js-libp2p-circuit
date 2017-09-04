@@ -13,6 +13,7 @@ const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
 const assignInWith = require('lodash/assignInWith')
 const proto = require('../protocol')
+const multiaddr = require('multiaddr')
 
 const multicodec = require('./../multicodec')
 
@@ -69,7 +70,9 @@ class Hop extends EE {
     }
 
     if (!message.dstPeer.addrs.length) {
-      message.dstPeer.addrs.push(`/ipfs/${message.dstPeer.id}`)
+      // TODO: use encapsulate here
+      const addr = multiaddr(`/p2p-circuit/ipfs/${PeerId.createFromBytes(message.dstPeer.id).toB58String()}`).buffer
+      message.dstPeer.addrs.push(addr)
     }
 
     this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.HOP, (err) => {
