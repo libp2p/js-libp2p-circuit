@@ -129,15 +129,30 @@ class Hop extends EE {
             return cb(err)
           }
 
-          const srcConn = srcStreamHandler.rest()
-          // circuit the src and dst streams
-          pull(
-            srcConn,
-            streamHandler.rest(),
-            srcConn
-          )
+          streamHandler.read((err, msg) => {
+            if (err) {
+              log.err(err)
+              return cb(err)
+            }
 
-          cb()
+            const srcConn = srcStreamHandler.rest()
+            if (msg.status === proto.CircuitRelay.Status.Success) {
+              // circuit the src and dst streams
+              pull(
+                srcConn,
+                streamHandler.rest(),
+                srcConn
+              )
+
+              cb()
+            } else {
+              // close/end the source stream if there was an error
+              pull(
+                pull.empty(),
+                srcConn
+              )
+            }
+          })
         })
       })
     })

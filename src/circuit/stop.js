@@ -7,6 +7,7 @@ const Connection = require('interface-connection').Connection
 const utilsFactory = require('./utils')
 const PeerInfo = require('peer-info')
 const proto = require('../protocol')
+const series = require('async/series')
 
 const debug = require('debug')
 
@@ -23,7 +24,10 @@ class Stop extends EE {
   handle (message, streamHandler, callback) {
     callback = callback || (() => {})
 
-    return this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.STOP, (err) => {
+    series([
+      (cb) => this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.STOP, cb),
+      (cb) => this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.Success, cb)
+    ], (err) => {
       if (err) {
         callback(err)
         return log(err)
