@@ -25,6 +25,13 @@ module.exports = (swarm, options, connHandler) => {
   listener.stopHandler = new Stop(swarm)
   listener.hopHandler = new Hop(swarm, options.hop)
 
+  /**
+   * Add swarm handler and listen for incoming connections
+   *
+   * @param {Multiaddr} ma
+   * @param {Function} callback
+   * @return {void}
+   */
   listener.listen = (ma, callback) => {
     callback = callback || (() => {})
 
@@ -65,12 +72,33 @@ module.exports = (swarm, options, connHandler) => {
     callback()
   }
 
+  /**
+   * Remove swarm listener
+   *
+   * @param {Function} cb
+   * @return {void}
+   */
   listener.close = (cb) => {
     swarm.unhandle(multicodec.stop)
     setImmediate(() => listener.emit('close'))
     cb()
   }
 
+  /**
+   * Get fixed up multiaddrs
+   *
+   * NOTE: This method will grab the peers multiaddrs and expand them such that:
+   *
+   * a) If it's an existing /p2p-circuit address for a specific relay i.e.
+   *    `/ip4/0.0.0.0/tcp/0/ipfs/QmRelay/p2p-circuit` this method will expand the
+   *    address to `/ip4/0.0.0.0/tcp/0/ipfs/QmRelay/p2p-circuit/ipfs/QmPeer` where
+   *    `QmPeer` is this peers id
+   * b) If it's not a /p2p-circuit address, it will encapsulate the address as a /p2p-circuit
+   *    addr such that dials a relay uses that address to dial this peer
+   *
+   * @param {Function} callback
+   * @return {void}
+   */
   listener.getAddrs = (callback) => {
     let addrs = swarm._peerInfo.multiaddrs.toArray()
 
@@ -94,7 +122,7 @@ module.exports = (swarm, options, connHandler) => {
       }
 
       if (!mafmt.Circuit.matches(addr)) {
-        if (addr.getPeerId() !== null) {
+        if (addr.getPeerId()) {
           // by default we're reachable over any relay
           listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(addr))
         } else {
