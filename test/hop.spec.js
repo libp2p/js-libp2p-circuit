@@ -17,7 +17,7 @@ const sinon = require('sinon')
 const expect = require('chai').expect
 
 describe('relay', function () {
-  describe(`handle circuit requests`, function () {
+  describe(`should handle circuit requests`, function () {
     let relay
     let swarm
     let fromConn
@@ -25,10 +25,21 @@ describe('relay', function () {
     let shake
 
     beforeEach(function (done) {
-      stream = handshake({timeout: 1000 * 60})
+      stream = handshake({ timeout: 1000 * 60 })
       shake = stream.handshake
       fromConn = new Connection(stream)
       fromConn.setPeerInfo(new PeerInfo(PeerId.createFromB58String('QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA')))
+
+      let peers = {
+        QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE:
+          new PeerInfo(PeerId.createFromB58String(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`)),
+        QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA:
+          new PeerInfo(PeerId.createFromB58String(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`)),
+        QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy:
+          new PeerInfo(PeerId.createFromB58String(`QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`))
+      }
+
+      Object.keys(peers).forEach((key) => { peers[key]._connectedMultiaddr = true }) // make it truthy
 
       waterfall([
         (cb) => PeerId.createFromJSON(nodes.node4, cb),
@@ -38,14 +49,25 @@ describe('relay', function () {
           swarm = {
             _peerInfo: peer,
             conns: {
-              QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE: new Connection()
+              QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE: new Connection(),
+              QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA: new Connection(),
+              QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy: new Connection()
+            },
+            _peerBook: {
+              get: (peer) => {
+                if (!peers[peer]) {
+                  throw new Error()
+                }
+
+                return peers[peer]
+              }
             }
           }
 
           cb()
         }
       ], () => {
-        relay = new Hop(swarm, {enabled: true})
+        relay = new Hop(swarm, { enabled: true })
         relay._circuit = sinon.stub()
         relay._circuit.callsArg(2, null, new Connection())
         done()
@@ -56,15 +78,15 @@ describe('relay', function () {
       relay._circuit.reset()
     })
 
-    it(`handle a valid circuit request`, function (done) {
+    it(`should handle a valid circuit request`, function (done) {
       let relayMsg = {
         type: proto.CircuitRelay.Type.HOP,
         srcPeer: {
-          id: Buffer.from(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`),
+          id: PeerId.createFromB58String(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).id,
           addrs: [multiaddr(`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).buffer]
         },
         dstPeer: {
-          id: Buffer.from(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`),
+          id: PeerId.createFromB58String(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).id,
           addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
         }
       }
@@ -77,15 +99,67 @@ describe('relay', function () {
       relay.handle(relayMsg, new StreamHandler(fromConn))
     })
 
+    it(`should handle a request to passive circuit`, function (done) {
+      let relayMsg = {
+        type: proto.CircuitRelay.Type.HOP,
+        srcPeer: {
+          id: PeerId.createFromB58String(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).id,
+          addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
+        },
+        dstPeer: {
+          id: PeerId.createFromB58String(`QmYJjAri5soV8RbeQcHaYYcTAYTET17QTvcoFMyKvRDTXe`).id,
+          addrs: [multiaddr(`/ipfs/QmYJjAri5soV8RbeQcHaYYcTAYTET17QTvcoFMyKvRDTXe`).buffer]
+        }
+      }
+
+      relay.active = false
+      lp.decodeFromReader(shake, (err, msg) => {
+        expect(err).to.be.null
+
+        const response = proto.CircuitRelay.decode(msg)
+        expect(response.code).to.equal(proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
+        expect(response.type).to.equal(proto.CircuitRelay.Type.STATUS)
+        done()
+      })
+
+      relay.handle(relayMsg, new StreamHandler(fromConn))
+    })
+
+    it(`should handle a request to active circuit`, function (done) {
+      let relayMsg = {
+        type: proto.CircuitRelay.Type.HOP,
+        srcPeer: {
+          id: PeerId.createFromB58String(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).id,
+          addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
+        },
+        dstPeer: {
+          id: PeerId.createFromB58String(`QmYJjAri5soV8RbeQcHaYYcTAYTET17QTvcoFMyKvRDTXe`).id,
+          addrs: [multiaddr(`/ipfs/QmYJjAri5soV8RbeQcHaYYcTAYTET17QTvcoFMyKvRDTXe`).buffer]
+        }
+      }
+
+      relay.active = true
+      relay.on('circuit:success', () => {
+        expect(relay._circuit.calledWith(sinon.match.any, relayMsg)).to.be.ok
+        done()
+      })
+
+      relay.on('circuit:error', (err) => {
+        done(err)
+      })
+
+      relay.handle(relayMsg, new StreamHandler(fromConn))
+    })
+
     it(`not dial to self`, function (done) {
       let relayMsg = {
         type: proto.CircuitRelay.Type.HOP,
         srcPeer: {
-          id: Buffer.from(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`),
+          id: PeerId.createFromB58String(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).id,
           addrs: [multiaddr(`/ipfs/QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).buffer]
         },
         dstPeer: {
-          id: Buffer.from(`QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`),
+          id: PeerId.createFromB58String(`QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`).id,
           addrs: [multiaddr(`/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`).buffer]
         }
       }
@@ -110,7 +184,7 @@ describe('relay', function () {
           addrs: [`sdfkjsdnfkjdsb`]
         },
         dstPeer: {
-          id: Buffer.from(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`),
+          id: PeerId.createFromB58String(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).id,
           addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
         }
       }
@@ -131,11 +205,11 @@ describe('relay', function () {
       let relayMsg = {
         type: proto.CircuitRelay.Type.HOP,
         srcPeer: {
-          id: Buffer.from(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`),
+          id: PeerId.createFromB58String(`QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).id,
           addrs: [multiaddr(`/ipfs/QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA`).buffer]
         },
         dstPeer: {
-          id: `sdfkjsdnfkjdsb`,
+          id: PeerId.createFromB58String(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`).id,
           addrs: [`sdfkjsdnfkjdsb`]
         }
       }

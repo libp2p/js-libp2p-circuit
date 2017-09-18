@@ -65,19 +65,35 @@ class Hop extends EE {
       return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.SUCCESS)
     }
 
-    if (message.dstPeer.id.toString() === this.peerInfo.id.toB58String()) {
+    const srcPeerId = PeerId.createFromBytes(message.dstPeer.id)
+    if (srcPeerId.toB58String() === this.peerInfo.id.toB58String()) {
       return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
     }
 
+    const dstPeerId = PeerId.createFromBytes(message.dstPeer.id).toB58String()
     if (!message.dstPeer.addrs.length) {
       // TODO: use encapsulate here
-      const addr = multiaddr(`/p2p-circuit/ipfs/${PeerId.createFromBytes(message.dstPeer.id).toB58String()}`).buffer
+      const addr = multiaddr(`/p2p-circuit/ipfs/${dstPeerId}`).buffer
       message.dstPeer.addrs.push(addr)
     }
 
     this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.HOP, (err) => {
       if (err) {
         return log(err)
+      }
+
+      let dstPeer
+      try {
+        dstPeer = this.swarm._peerBook.get(dstPeerId)
+        if (!dstPeer.isConnected() && !this.active) {
+          throw new Error('No Connection to peer')
+        }
+      } catch (err) {
+        if (!this.active) {
+          log.err(err)
+          setImmediate(() => this.emit('circuit:error', err))
+          return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
+        }
       }
 
       return this._circuit(streamHandler.rest(), message, (err) => {

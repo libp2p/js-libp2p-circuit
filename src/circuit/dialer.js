@@ -57,6 +57,7 @@ class Dialer {
         log.err(err)
         return cb(err)
       }
+
       dstConn.setInnerConn(conn)
       cb(null, dstConn)
     })
@@ -75,37 +76,29 @@ class Dialer {
     cb = once(cb || (() => {}))
 
     if (!this.relayPeers.get(this.utils.getB58String(peer))) {
-      return this._dialRelay(peer, (err, streamHandler) => {
-        if (err) {
-          return log.err(err)
-        }
-
-        streamHandler.write(proto.CircuitRelay.encode({
+      let streamHandler
+      waterfall([
+        (wCb) => this._dialRelay(peer, wCb),
+        (sh, wCb) => {
+          streamHandler = sh
+          wCb()
+        },
+        (wCb) => streamHandler.write(proto.CircuitRelay.encode({
           type: proto.CircuitRelay.Type.CAN_HOP
-        }), (err) => {
-          if (err) {
-            log.err(err)
-            return cb(err)
+        }), wCb),
+        (wCb) => streamHandler.read(wCb),
+        (msg, wCb) => {
+          const response = proto.CircuitRelay.decode(msg)
+
+          if (response.code !== proto.CircuitRelay.Status.SUCCESS) {
+            return log(`HOP not supported, skipping - ${this.utils.getB58String(peer)}`)
           }
 
-          streamHandler.read((err, msg) => {
-            if (err) {
-              log.err(err)
-              return cb(err)
-            }
-
-            const response = proto.CircuitRelay.decode(msg)
-
-            if (response.code !== proto.CircuitRelay.Status.SUCCESS) {
-              return log(`HOP not supported, skipping - ${this.utils.getB58String(peer)}`)
-            }
-
-            log(`HOP supported adding as relay - ${this.utils.getB58String(peer)}`)
-            this.relayPeers.set(this.utils.getB58String(peer), peer)
-            cb(null)
-          })
-        })
-      })
+          log(`HOP supported adding as relay - ${this.utils.getB58String(peer)}`)
+          this.relayPeers.set(this.utils.getB58String(peer), peer)
+          wCb(null)
+        }
+      ], cb)
     }
 
     return cb(null)
@@ -177,6 +170,7 @@ class Dialer {
     dstMa = multiaddr(dstMa)
 
     const srcMas = this.swarm._peerInfo.multiaddrs.toArray()
+    let streamHandler
     waterfall([
       (cb) => {
         if (relay instanceof Connection) {
@@ -184,7 +178,11 @@ class Dialer {
         }
         return this._dialRelay(this.utils.peerInfoFromMa(relay), cb)
       },
-      (streamHandler, cb) => {
+      (sh, cb) => {
+        streamHandler = sh
+        cb(null)
+      },
+      (cb) => {
         log(`negotiating relay for peer ${dstMa.getPeerId()}`)
         streamHandler.write(
           proto.CircuitRelay.encode({
@@ -197,35 +195,21 @@ class Dialer {
               id: PeerId.createFromB58String(dstMa.getPeerId()).id,
               addrs: [dstMa.buffer]
             }
-          }),
-          (err) => {
-            if (err) {
-              log.err(err)
-              return cb(err)
-            }
-
-            cb(null, streamHandler)
-          })
+          }), cb)
       },
-      (streamHandler, cb) => {
-        streamHandler.read((err, msg) => {
-          if (err) {
-            log.err(err)
-            return cb(err)
-          }
+      (cb) => streamHandler.read(cb),
+      (msg, cb) => {
+        const message = proto.CircuitRelay.decode(msg)
+        if (message.type !== proto.CircuitRelay.Type.STATUS) {
+          return cb(new Error(`Got invalid message type - ` +
+            `expected ${proto.CircuitRelay.Type.STATUS} got ${message.type}`))
+        }
 
-          const message = proto.CircuitRelay.decode(msg)
-          if (message.type !== proto.CircuitRelay.Type.STATUS) {
-            return cb(new Error(`Got invalid message type - ` +
-              `expected ${proto.CircuitRelay.Type.STATUS} got ${message.type}`))
-          }
+        if (message.code !== proto.CircuitRelay.Status.SUCCESS) {
+          return cb(new Error(`Got ${message.code} error code trying to dial over relay`))
+        }
 
-          if (message.code !== proto.CircuitRelay.Status.SUCCESS) {
-            return cb(new Error(`Got ${message.code} error code trying to dial over relay`))
-          }
-
-          cb(null, new Connection(streamHandler.rest()))
-        })
+        cb(null, new Connection(streamHandler.rest()))
       }
     ], callback)
   }
