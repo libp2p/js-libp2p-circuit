@@ -42,9 +42,7 @@ class Hop extends EE {
         enabled: false
       },
       options,
-      (orig, src) => {
-        typeof src === 'undefined' ? false : src
-      })
+      (orig, src) => typeof src === 'undefined' ? false : src)
 
     this.active = this.config.active
   }

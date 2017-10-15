@@ -1,4 +1,4 @@
-/* eslint-env mocha */
+/* eslint-env jest */
 'use strict'
 
 const Hop = require('../src/circuit/hop')
@@ -14,7 +14,6 @@ const proto = require('../src/protocol')
 const StreamHandler = require('../src/circuit/stream-handler')
 
 const sinon = require('sinon')
-const expect = require('chai').expect
 
 describe('relay', function () {
   describe(`should handle circuit requests`, function () {
@@ -92,7 +91,7 @@ describe('relay', function () {
       }
 
       relay.on('circuit:success', () => {
-        expect(relay._circuit.calledWith(sinon.match.any, relayMsg)).to.be.ok
+        expect(relay._circuit.calledWith(sinon.match.any, relayMsg)).toBeTruthy()
         done()
       })
 
@@ -114,11 +113,11 @@ describe('relay', function () {
 
       relay.active = false
       lp.decodeFromReader(shake, (err, msg) => {
-        expect(err).to.be.null
+        expect(err).toBeNull()
 
         const response = proto.CircuitRelay.decode(msg)
-        expect(response.code).to.equal(proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
-        expect(response.type).to.equal(proto.CircuitRelay.Type.STATUS)
+        expect(response.code).toEqual(proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
+        expect(response.type).toEqual(proto.CircuitRelay.Type.STATUS)
         done()
       })
 
@@ -140,7 +139,7 @@ describe('relay', function () {
 
       relay.active = true
       relay.on('circuit:success', () => {
-        expect(relay._circuit.calledWith(sinon.match.any, relayMsg)).to.be.ok
+        expect(relay._circuit.calledWith(sinon.match.any, relayMsg)).toBeTruthy()
         done()
       })
 
@@ -165,11 +164,11 @@ describe('relay', function () {
       }
 
       lp.decodeFromReader(shake, (err, msg) => {
-        expect(err).to.be.null
+        expect(err).toBeNull()
 
         const response = proto.CircuitRelay.decode(msg)
-        expect(response.code).to.equal(proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
-        expect(response.type).to.equal(proto.CircuitRelay.Type.STATUS)
+        expect(response.code).toEqual(proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
+        expect(response.type).toEqual(proto.CircuitRelay.Type.STATUS)
         done()
       })
 
@@ -190,11 +189,11 @@ describe('relay', function () {
       }
 
       lp.decodeFromReader(shake, (err, msg) => {
-        expect(err).to.be.null
+        expect(err).toBeNull()
 
         const response = proto.CircuitRelay.decode(msg)
-        expect(response.code).to.equal(proto.CircuitRelay.Status.HOP_SRC_MULTIADDR_INVALID)
-        expect(response.type).to.equal(proto.CircuitRelay.Type.STATUS)
+        expect(response.code).toEqual(proto.CircuitRelay.Status.HOP_SRC_MULTIADDR_INVALID)
+        expect(response.type).toEqual(proto.CircuitRelay.Type.STATUS)
         done()
       })
 
@@ -215,11 +214,11 @@ describe('relay', function () {
       }
 
       lp.decodeFromReader(shake, (err, msg) => {
-        expect(err).to.be.null
+        expect(err).toBeNull()
 
         const response = proto.CircuitRelay.decode(msg)
-        expect(response.code).to.equal(proto.CircuitRelay.Status.HOP_DST_MULTIADDR_INVALID)
-        expect(response.type).to.equal(proto.CircuitRelay.Type.STATUS)
+        expect(response.code).toEqual(proto.CircuitRelay.Status.HOP_DST_MULTIADDR_INVALID)
+        expect(response.type).toEqual(proto.CircuitRelay.Type.STATUS)
         done()
       })
 
@@ -227,4 +226,3 @@ describe('relay', function () {
     })
   })
 })
-

@@ -1,4 +1,4 @@
-/* eslint-env mocha */
+/* eslint-env jest */
 /* eslint max-nested-callbacks: ["error", 5] */
 
 'use strict'
@@ -18,7 +18,6 @@ const StreamHandler = require('../src/circuit/stream-handler')
 const utilsFactory = require('../src/circuit/utils')
 
 const sinon = require('sinon')
-const expect = require('chai').expect
 
 describe(`dialer tests`, function () {
   describe(`.dial`, function () {
@@ -37,7 +36,7 @@ describe(`dialer tests`, function () {
 
     it(`fail on non circuit addr`, function () {
       const dstMa = multiaddr(`/ipfs/${nodes.node4.id}`)
-      expect(() => dialer.dial(dstMa)).to.throw(/invalid circuit address/)
+      expect(() => dialer.dial(dstMa)).toThrow(/invalid circuit address/)
     })
 
     it(`dial a peer`, function (done) {
@@ -47,8 +46,8 @@ describe(`dialer tests`, function () {
       })
 
       dialer.dial(dstMa, (err, conn) => {
-        expect(err).to.be.null
-        expect(conn).to.be.an.instanceOf(Connection)
+        expect(err).toBeNull()
+        expect(conn).toBeInstanceOf(Connection)
         done()
       })
     })
@@ -56,13 +55,13 @@ describe(`dialer tests`, function () {
     it(`dial a peer over the specified relay`, function (done) {
       const dstMa = multiaddr(`/ipfs/${nodes.node3.id}/p2p-circuit/ipfs/${nodes.node4.id}`)
       dialer._dialPeer.callsFake(function (dstMa, relay, callback) {
-        expect(relay.toString()).to.equal(`/ipfs/${nodes.node3.id}`)
+        expect(relay.toString()).toEqual(`/ipfs/${nodes.node3.id}`)
         return callback(null, new Connection())
       })
 
       dialer.dial(dstMa, (err, conn) => {
-        expect(err).to.be.null
-        expect(conn).to.be.an.instanceOf(Connection)
+        expect(err).toBeNull()
+        expect(conn).toBeInstanceOf(Connection)
         done()
       })
     })
@@ -98,7 +97,7 @@ describe(`dialer tests`, function () {
         })]),
         lp.encode(),
         pull.collect((err, encoded) => {
-          expect(err).to.be.null
+          expect(err).toBeNull()
           encoded.forEach((e) => shake.write(e))
           dialer._dialRelay.callsFake((peer, cb) => {
             cb(null, new StreamHandler(fromConn))
@@ -107,8 +106,8 @@ describe(`dialer tests`, function () {
       )
 
       dialer.canHop(peer, (err) => {
-        expect(err).to.be.null
-        expect(dialer.relayPeers.has(peer.id.toB58String())).to.be.ok
+        expect(err).toBeNull()
+        expect(dialer.relayPeers.has(peer.id.toB58String())).toBeTruthy()
       })
     })
 
@@ -120,7 +119,7 @@ describe(`dialer tests`, function () {
         })]),
         lp.encode(),
         pull.collect((err, encoded) => {
-          expect(err).to.be.null
+          expect(err).toBeNull()
           encoded.forEach((e) => shake.write(e))
           dialer._dialRelay.callsFake((peer, cb) => {
             cb(null, new StreamHandler(fromConn))
@@ -129,8 +128,8 @@ describe(`dialer tests`, function () {
       )
 
       dialer.canHop(peer, (err) => {
-        expect(err).to.be.null
-        expect(dialer.relayPeers.has(peer.id.toB58String())).to.not.be.ok
+        expect(err).toBeNull()
+        expect(dialer.relayPeers.has(peer.id.toB58String())).toBeFalsy()
       })
     })
   })
@@ -157,13 +156,13 @@ describe(`dialer tests`, function () {
           return callback(null, dialer.relayPeers.get(nodes.node3.id))
         }
 
-        callback(`error`)
+        return callback(new Error('error'))
       })
 
       dialer._dialPeer(dstMa, (err, conn) => {
-        expect(err).to.be.null
-        expect(conn).to.be.an.instanceOf(Connection)
-        expect(conn).to.deep.equal(dialer.relayPeers.get(nodes.node3.id))
+        expect(err).toBeNull()
+        expect(conn).toBeInstanceOf(Connection)
+        expect(conn).toEqual(dialer.relayPeers.get(nodes.node3.id))
         done()
       })
     })
@@ -171,13 +170,13 @@ describe(`dialer tests`, function () {
     it(`should fail dialing a peer over any relay`, function (done) {
       const dstMa = multiaddr(`/ipfs/${nodes.node4.id}`)
       dialer._negotiateRelay.callsFake(function (conn, dstMa, callback) {
-        callback(`error`)
+        callback(new Error('error'))
       })
 
       dialer._dialPeer(dstMa, (err, conn) => {
-        expect(conn).to.be.undefined
-        expect(err).to.not.be.null
-        expect(err).to.equal(`no relay peers were found or all relays failed to dial`)
+        expect(conn).toBeUndefined()
+        expect(err).not.toBeNull()
+        expect(err).toEqual(`no relay peers were found or all relays failed to dial`)
         done()
       })
     })
@@ -227,18 +226,18 @@ describe(`dialer tests`, function () {
           type: proto.CircuitRelay.Type.STATUS,
           code: proto.CircuitRelay.Status.SUCCESS
         }))
-        expect(err).to.be.null
-        expect(proto.CircuitRelay.decode(msg).dstPeer.addrs[0]).to.deep.equal(dstMa.buffer)
+        expect(err).toBeNull()
+        expect(proto.CircuitRelay.decode(msg).dstPeer.addrs[0]).toEqual(dstMa.buffer)
         done()
       })
     })
 
     it(`should handle failed relay negotiation`, function (done) {
       callback.callsFake((err, msg) => {
-        expect(err).to.not.be.null
-        expect(err).to.be.an.instanceOf(Error)
-        expect(err.message).to.be.equal(`Got 400 error code trying to dial over relay`)
-        expect(callback.calledOnce).to.be.ok
+        expect(err).not.toBeNull()
+        expect(err).toBeInstanceOf(Error)
+        expect(err.message).toEqual(`Got 400 error code trying to dial over relay`)
+        expect(callback.calledOnce).toBeTruthy()
         done()
       })
 
@@ -253,7 +252,7 @@ describe(`dialer tests`, function () {
           })]), // send arbitrary non 200 code
           lp.encode(),
           pull.collect((err, encoded) => {
-            expect(err).to.be.null
+            expect(err).toBeNull()
             encoded.forEach((e) => shake.write(e))
           })
         )

@@ -1,4 +1,4 @@
-/* eslint-env mocha */
+/* eslint-env jest */
 'use strict'
 
 const Stop = require('../src/circuit/stop')
@@ -10,8 +10,6 @@ const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const StreamHandler = require('../src/circuit/stream-handler')
 const proto = require('../src/protocol')
-
-const expect = require('chai').expect
 
 describe('stop', function () {
   describe(`handle relayed connections`, function () {
@@ -56,7 +54,7 @@ describe('stop', function () {
           addrs: [`/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`]
         }
       }, new StreamHandler(conn), (conn) => {
-        expect(conn).to.be.not.null
+        expect(conn).not.toBeNull()
         done()
       })
     })
@@ -73,7 +71,7 @@ describe('stop', function () {
           addrs: [`sdflksdfndsklfnlkdf`]
         }
       }, new StreamHandler(conn), (err, conn) => {
-        expect(err).to.be.not.null
+        expect(err).not.toBeNull()
         done()
       })
     })

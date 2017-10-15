@@ -1,7 +1,5 @@
-/* eslint-env mocha */
+/* eslint-env jest */
 'use strict'
-
-const expect = require('chai').expect
 
 const proto = require('../src/protocol')
 
@@ -9,7 +7,7 @@ describe('protocol', function () {
   let msgObject = null
   let message = null
 
-  before(() => {
+  beforeAll(() => {
     msgObject = {
       type: proto.CircuitRelay.Type.HOP,
       srcPeer: {
@@ -35,11 +33,11 @@ describe('protocol', function () {
   })
 
   it(`should source and dest`, () => {
-    expect(message.srcPeer).to.not.be.null
-    expect(message.dstPeer).to.not.be.null
+    expect(message.srcPeer).not.toBeNull()
+    expect(message.dstPeer).not.toBeNull()
   })
 
   it(`should encode message`, () => {
-    expect(message.message).to.deep.equal(msgObject.message)
+    expect(message.message).toEqual(msgObject.message)
   })
 })
