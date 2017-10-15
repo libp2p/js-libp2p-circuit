@@ -160,7 +160,7 @@ describe(`dialer tests`, function () {
           return callback(null, dialer.relayPeers.get(nodes.node3.id))
         }
 
-        callback(`error`)
+        callback(new Error(`error`))
       })
 
       dialer._dialPeer(dstMa, (err, conn) => {
@@ -174,7 +174,7 @@ describe(`dialer tests`, function () {
     it(`should fail dialing a peer over any relay`, function (done) {
       const dstMa = multiaddr(`/ipfs/${nodes.node4.id}`)
       dialer._negotiateRelay.callsFake(function (conn, dstMa, callback) {
-        callback(`error`)
+        callback(new Error(`error`))
       })
 
       dialer._dialPeer(dstMa, (err, conn) => {
