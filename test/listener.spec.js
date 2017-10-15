@@ -1,4 +1,4 @@
-/* eslint-env jest */
+/* eslint-env mocha */
 'use strict'
 
 const Listener = require('../src/listener')
@@ -7,13 +7,18 @@ const waterfall = require('async/waterfall')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const multiaddr = require('multiaddr')
-const sinon = require('sinon')
 const handshake = require('pull-handshake')
 const Connection = require('interface-connection').Connection
 const proto = require('../src/protocol')
 const lp = require('pull-length-prefixed')
 const pull = require('pull-stream')
 const multicodec = require('../src/multicodec')
+
+const chai = require('chai')
+const dirtyChai = require('dirty-chai')
+const expect = chai.expect
+chai.use(dirtyChai)
+const sinon = require('sinon')
 
 describe('listener', function () {
   describe(`listen`, function () {
@@ -71,13 +76,13 @@ describe('listener', function () {
       }
 
       listener.hopHandler.handle = (message, conn) => {
-        expect(message.type).toEqual(proto.CircuitRelay.Type.HOP)
+        expect(message.type).to.equal(proto.CircuitRelay.Type.HOP)
 
-        expect(message.srcPeer.id.toString()).toEqual(relayMsg.srcPeer.id)
-        expect(message.srcPeer.addrs[0].toString()).toEqual(relayMsg.srcPeer.addrs[0])
+        expect(message.srcPeer.id.toString()).to.equal(relayMsg.srcPeer.id)
+        expect(message.srcPeer.addrs[0].toString()).to.equal(relayMsg.srcPeer.addrs[0])
 
-        expect(message.dstPeer.id.toString()).toEqual(relayMsg.dstPeer.id)
-        expect(message.dstPeer.addrs[0].toString()).toEqual(relayMsg.dstPeer.addrs[0])
+        expect(message.dstPeer.id.toString()).to.equal(relayMsg.dstPeer.id)
+        expect(message.dstPeer.addrs[0].toString()).to.equal(relayMsg.dstPeer.addrs[0])
 
         done()
       }
@@ -86,7 +91,7 @@ describe('listener', function () {
         pull.values([proto.CircuitRelay.encode(relayMsg)]),
         lp.encode(),
         pull.collect((err, encoded) => {
-          expect(err).toBeNull()
+          expect(err).to.be.null()
           encoded.forEach((e) => shake.write(e))
         })
       )
@@ -108,13 +113,13 @@ describe('listener', function () {
       }
 
       listener.stopHandler.handle = (message, conn) => {
-        expect(message.type).toEqual(proto.CircuitRelay.Type.STOP)
+        expect(message.type).to.equal(proto.CircuitRelay.Type.STOP)
 
-        expect(message.srcPeer.id.toString()).toEqual(relayMsg.srcPeer.id)
-        expect(message.srcPeer.addrs[0].toString()).toEqual(relayMsg.srcPeer.addrs[0])
+        expect(message.srcPeer.id.toString()).to.equal(relayMsg.srcPeer.id)
+        expect(message.srcPeer.addrs[0].toString()).to.equal(relayMsg.srcPeer.addrs[0])
 
-        expect(message.dstPeer.id.toString()).toEqual(relayMsg.dstPeer.id)
-        expect(message.dstPeer.addrs[0].toString()).toEqual(relayMsg.dstPeer.addrs[0])
+        expect(message.dstPeer.id.toString()).to.equal(relayMsg.dstPeer.id)
+        expect(message.dstPeer.addrs[0].toString()).to.equal(relayMsg.dstPeer.addrs[0])
 
         done()
       }
@@ -123,7 +128,7 @@ describe('listener', function () {
         pull.values([proto.CircuitRelay.encode(relayMsg)]),
         lp.encode(),
         pull.collect((err, encoded) => {
-          expect(err).toBeNull()
+          expect(err).to.be.null()
           encoded.forEach((e) => shake.write(e))
         })
       )
@@ -145,13 +150,13 @@ describe('listener', function () {
       }
 
       listener.hopHandler.handle = (message, conn) => {
-        expect(message.type).toEqual(proto.CircuitRelay.Type.CAN_HOP)
+        expect(message.type).to.equal(proto.CircuitRelay.Type.CAN_HOP)
 
-        expect(message.srcPeer.id.toString()).toEqual(relayMsg.srcPeer.id)
-        expect(message.srcPeer.addrs[0].toString()).toEqual(relayMsg.srcPeer.addrs[0])
+        expect(message.srcPeer.id.toString()).to.equal(relayMsg.srcPeer.id)
+        expect(message.srcPeer.addrs[0].toString()).to.equal(relayMsg.srcPeer.addrs[0])
 
-        expect(message.dstPeer.id.toString()).toEqual(relayMsg.dstPeer.id)
-        expect(message.dstPeer.addrs[0].toString()).toEqual(relayMsg.dstPeer.addrs[0])
+        expect(message.dstPeer.id.toString()).to.equal(relayMsg.dstPeer.id)
+        expect(message.dstPeer.addrs[0].toString()).to.equal(relayMsg.dstPeer.addrs[0])
 
         done()
       }
@@ -160,7 +165,7 @@ describe('listener', function () {
         pull.values([proto.CircuitRelay.encode(relayMsg)]),
         lp.encode(),
         pull.collect((err, encoded) => {
-          expect(err).toBeNull()
+          expect(err).to.be.null()
           encoded.forEach((e) => shake.write(e))
         })
       )
@@ -185,13 +190,13 @@ describe('listener', function () {
         pull.values([Buffer.from([relayMsg])]),
         lp.encode(),
         pull.collect((err, encoded) => {
-          expect(err).toBeNull()
+          expect(err).to.be.null()
           encoded.forEach((e) => shake.write(e))
         }),
         lp.decodeFromReader(shake, {maxLength: this.maxLength}, (err, msg) => {
-          expect(err).toBeNull()
-          expect(proto.CircuitRelay.decode(msg).type).toEqual(proto.CircuitRelay.Type.STATUS)
-          expect(proto.CircuitRelay.decode(msg).code).toEqual(proto.CircuitRelay.Status.MALFORMED_MESSAGE)
+          expect(err).to.be.null()
+          expect(proto.CircuitRelay.decode(msg).type).to.equal(proto.CircuitRelay.Type.STATUS)
+          expect(proto.CircuitRelay.decode(msg).code).to.equal(proto.CircuitRelay.Status.MALFORMED_MESSAGE)
           done()
         })
       )
@@ -228,8 +233,8 @@ describe('listener', function () {
       peerInfo.multiaddrs.add(`/ip4/127.0.0.1/tcp/4003/ws`)
 
       listener.getAddrs((err, addrs) => {
-        expect(err).toBeNull()
-        expect(addrs).toEqual([
+        expect(err).to.be.null()
+        expect(addrs).to.deep.equal([
           multiaddr(`/p2p-circuit/ip4/0.0.0.0/tcp/4002/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`),
           multiaddr(`/p2p-circuit/ip4/127.0.0.1/tcp/4003/ws/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`)])
       })
@@ -239,10 +244,10 @@ describe('listener', function () {
       peerInfo.multiaddrs.add(`/ip4/127.0.0.1/tcp/4003/ws`)
       peerInfo.multiaddrs.add(`/p2p-circuit/ip4/0.0.0.0/tcp/4002`)
       listener.getAddrs((err, addrs) => {
-        expect(err).toBeNull()
+        expect(err).to.be.null()
         expect(addrs[0]
           .toString())
-          .toEqual(`/p2p-circuit/ip4/0.0.0.0/tcp/4002/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`)
+          .to.equal(`/p2p-circuit/ip4/0.0.0.0/tcp/4002/ipfs/QmQvM2mpqkjyXWbTHSUidUAWN26GgdMphTh9iGDdjgVXCy`)
       })
     })
   })
