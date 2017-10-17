@@ -40,7 +40,9 @@ describe(`dialer tests`, function () {
 
     it(`fail on non circuit addr`, function () {
       const dstMa = multiaddr(`/ipfs/${nodes.node4.id}`)
-      expect(() => dialer.dial(dstMa)).to.throw(/invalid circuit address/)
+      expect(() => dialer.dial(dstMa, (err) => {
+        err.to.match(/invalid circuit address/)
+      }))
     })
 
     it(`dial a peer`, function (done) {
@@ -80,7 +82,7 @@ describe(`dialer tests`, function () {
     let peer = new PeerInfo(PeerId.createFromB58String('QmQWqGdndSpAkxfk8iyiJyz3XXGkrDNujvc8vEst3baubA'))
 
     beforeEach(function () {
-      stream = handshake({timeout: 1000 * 60})
+      stream = handshake({ timeout: 1000 * 60 })
       shake = stream.handshake
       fromConn = new Connection(stream)
 
@@ -209,7 +211,7 @@ describe(`dialer tests`, function () {
         (cb) => {
           dialer.relayConns = new Map()
           dialer._negotiateRelay.callThrough()
-          stream = handshake({timeout: 1000 * 60})
+          stream = handshake({ timeout: 1000 * 60 })
           shake = stream.handshake
           conn = new Connection()
           conn.setPeerInfo(new PeerInfo(PeerId.createFromB58String(`QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE`)))

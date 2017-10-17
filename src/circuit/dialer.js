@@ -41,10 +41,11 @@ class Dialer {
    * @memberOf Dialer
    */
   dial (ma, cb) {
+    cb = cb || (() => {})
     const strMa = ma.toString()
     if (!strMa.includes('/p2p-circuit')) {
       log.err('invalid circuit address')
-      throw new Error('invalid circuit address')
+      return cb(new Error('invalid circuit address'))
     }
 
     const addr = strMa.split('p2p-circuit') // extract relay address if any
