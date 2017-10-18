@@ -6,6 +6,8 @@ const dirtyChai = require('dirty-chai')
 const expect = chai.expect
 chai.use(dirtyChai)
 
+const multiaddr = require('multiaddr')
+
 const proto = require('../src/protocol')
 
 describe('protocol', function () {
@@ -16,19 +18,19 @@ describe('protocol', function () {
     msgObject = {
       type: proto.CircuitRelay.Type.HOP,
       srcPeer: {
-        id: 'QmSource',
+        id: Buffer.from('QmSource'),
         addrs: [
-          '/p2p-circuit/ipfs/QmSource',
-          '/p2p-circuit/ipv4/0.0.0.0/9000/ipfs/QmSource',
-          'ipv4/0.0.0.0/9000/ipfs/QmSource'
+          multiaddr('/p2p-circuit/ipfs/QmSource').buffer,
+          multiaddr('/p2p-circuit/ip4/0.0.0.0/tcp/9000/ipfs/QmSource').buffer,
+          multiaddr('/ip4/0.0.0.0/tcp/9000/ipfs/QmSource').buffer
         ]
       },
       dstPeer: {
-        id: 'QmDest',
+        id: Buffer.from('QmDest'),
         addrs: [
-          '/p2p-circuit/ipfs/QmDest',
-          '/p2p-circuit/ipv4/1.1.1.1/9000/ipfs/QmDest',
-          'ipv4/1.1.1.1/9000/ipfs/QmDest'
+          multiaddr('/p2p-circuit/ipfs/QmDest').buffer,
+          multiaddr('/p2p-circuit/ip4/1.1.1.1/tcp/9000/ipfs/QmDest').buffer,
+          multiaddr('/ip4/1.1.1.1/tcp/9000/ipfs/QmDest').buffer
         ]
       }
     }
@@ -38,8 +40,8 @@ describe('protocol', function () {
   })
 
   it(`should source and dest`, () => {
-    expect(message.srcPeer).to.not.be.null()
-    expect(message.dstPeer).to.not.be.null()
+    expect(message.srcPeer).to.deep.equal(msgObject.srcPeer)
+    expect(message.dstPeer).to.deep.equal(msgObject.dstPeer)
   })
 
   it(`should encode message`, () => {

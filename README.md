@@ -194,4 +194,4 @@ Small note: If editing the README, please conform to the [standard-readme](https
 
 ## License
 
-[MIT](LICENSE) © 2015-2016 Protocol Labs
+[MIT](LICENSE) © 2017 Protocol Labs

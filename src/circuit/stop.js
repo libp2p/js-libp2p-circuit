@@ -38,7 +38,7 @@ class Stop extends EE {
       const newConn = new Connection(streamHandler.rest())
       newConn.setPeerInfo(peerInfo)
       setImmediate(() => this.emit('connection', newConn))
-      callback(newConn)
+      callback(null, newConn)
     })
   }
 }
