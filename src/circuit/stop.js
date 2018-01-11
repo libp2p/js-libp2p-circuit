@@ -26,8 +26,15 @@ class Stop extends EE {
     callback = callback || (() => {})
 
     series([
-      (cb) => this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.STOP, cb),
-      (cb) => this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.Success, cb)
+      (cb) => this.utils.validateAddrs(
+        message,
+        streamHandler,
+        proto.CircuitRelay.Type.STOP,
+        cb),
+      (cb) => this.utils.writeResponse(
+        streamHandler,
+        proto.CircuitRelay.Status.Success,
+        cb)
     ], (err) => {
       if (err) {
         callback() // we don't return the error here, since multistream select don't expect one

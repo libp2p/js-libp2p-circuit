@@ -77,33 +77,39 @@ class Hop extends EE {
       message.dstPeer.addrs.push(addr)
     }
 
-    this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.HOP, (err) => {
-      if (err) {
-        return log(err)
-      }
-
-      let dstPeer
-      try {
-        dstPeer = this.swarm._peerBook.get(dstPeerId)
-        if (!dstPeer.isConnected() && !this.active) {
-          throw new Error('No Connection to peer')
-        }
-      } catch (err) {
-        if (!this.active) {
-          log.err(err)
-          setImmediate(() => this.emit('circuit:error', err))
-          return this.utils.writeResponse(streamHandler, proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
-        }
-      }
-
-      return this._circuit(streamHandler.rest(), message, (err) => {
+    this.utils.validateAddrs(message, streamHandler, proto.CircuitRelay.Type.HOP,
+      (err) => {
         if (err) {
+          return log(err)
+        }
+
+        const noPeer = (err) => {
           log.err(err)
           setImmediate(() => this.emit('circuit:error', err))
+          return this.utils.writeResponse(streamHandler,
+            proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
         }
-        setImmediate(() => this.emit('circuit:success'))
+
+        let dstPeer
+        try {
+          dstPeer = this.swarm._peerBook.get(dstPeerId)
+          if (!dstPeer.isConnected() && !this.active) {
+            return noPeer(Error('No Connection to peer'))
+          }
+        } catch (err) {
+          if (!this.active) {
+            return noPeer(err)
+          }
+        }
+
+        return this._circuit(streamHandler.rest(), message, (err) => {
+          if (err) {
+            log.err(err)
+            setImmediate(() => this.emit('circuit:error', err))
+          }
+          setImmediate(() => this.emit('circuit:success'))
+        })
       })
-    })
   }
 
   /**
@@ -119,59 +125,63 @@ class Hop extends EE {
     this._dialPeer(message.dstPeer, (err, dstConn) => {
       const srcStreamHandler = new StreamHandler(conn)
       if (err) {
-        this.utils.writeResponse(srcStreamHandler, proto.CircuitRelay.Status.HOP_CANT_DIAL_DST)
+        this.utils.writeResponse(srcStreamHandler,
+          proto.CircuitRelay.Status.HOP_CANT_DIAL_DST)
         pull(pull.empty(), srcStreamHandler.rest())
         log.err(err)
         return cb(err)
       }
 
-      return this.utils.writeResponse(srcStreamHandler, proto.CircuitRelay.Status.SUCCESS, (err) => {
-        if (err) {
-          log.err(err)
-          return cb(err)
-        }
-
-        const streamHandler = new StreamHandler(dstConn)
-        const stopMsg = Object.assign({}, message, {
-          type: proto.CircuitRelay.Type.STOP // change the message type
-        })
-        streamHandler.write(proto.CircuitRelay.encode(stopMsg), (err) => {
+      return this.utils.writeResponse(srcStreamHandler,
+        proto.CircuitRelay.Status.SUCCESS,
+        (err) => {
           if (err) {
-            const errStreamHandler = new StreamHandler(conn)
-            this.utils.writeResponse(errStreamHandler, proto.CircuitRelay.Status.HOP_CANT_OPEN_DST_STREAM)
-            pull(pull.empty(), errStreamHandler.rest())
-
             log.err(err)
             return cb(err)
           }
 
-          streamHandler.read((err, msg) => {
+          const streamHandler = new StreamHandler(dstConn)
+          const stopMsg = Object.assign({}, message, {
+            type: proto.CircuitRelay.Type.STOP // change the message type
+          })
+          streamHandler.write(proto.CircuitRelay.encode(stopMsg), (err) => {
             if (err) {
+              const errStreamHandler = new StreamHandler(conn)
+              this.utils.writeResponse(errStreamHandler,
+                proto.CircuitRelay.Status.HOP_CANT_OPEN_DST_STREAM)
+              pull(pull.empty(), errStreamHandler.rest())
+
               log.err(err)
               return cb(err)
             }
 
-            const message = proto.CircuitRelay.decode(msg)
-            const srcConn = srcStreamHandler.rest()
-            if (message.code === proto.CircuitRelay.Status.SUCCESS) {
-              // circuit the src and dst streams
-              pull(
-                srcConn,
-                streamHandler.rest(),
-                srcConn
-              )
+            streamHandler.read((err, msg) => {
+              if (err) {
+                log.err(err)
+                return cb(err)
+              }
 
-              cb()
-            } else {
-              // close/end the source stream if there was an error
-              pull(
-                pull.empty(),
-                srcConn
-              )
-            }
+              const message = proto.CircuitRelay.decode(msg)
+              const srcConn = srcStreamHandler.rest()
+              if (message.code === proto.CircuitRelay.Status.SUCCESS) {
+                // circuit the src and dst streams
+                pull(
+                  srcConn,
+                  streamHandler.rest(),
+                  srcConn
+                )
+
+                cb()
+              } else {
+                // close/end the source stream if there was an error
+                pull(
+                  pull.empty(),
+                  srcConn
+                )
+              }
+            })
           })
         })
-      })
     })
   }
 

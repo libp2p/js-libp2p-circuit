@@ -1,13 +1,15 @@
 'use strict'
 
-const Connection = require('interface-connection').Connection
+const once = require('once')
+const PeerId = require('peer-id')
+const waterfall = require('async/waterfall')
 const isFunction = require('lodash.isfunction')
 const multiaddr = require('multiaddr')
-const once = require('once')
-const waterfall = require('async/waterfall')
+
+const Connection = require('interface-connection').Connection
+
 const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
-const PeerId = require('peer-id')
 
 const debug = require('debug')
 const log = debug('libp2p:circuit:dialer')
@@ -53,15 +55,16 @@ class Dialer {
     const peer = multiaddr(addr[1] || addr[0])
 
     const dstConn = new Connection()
-    setImmediate(this._dialPeer.bind(this), peer, relay, (err, conn) => {
-      if (err) {
-        log.err(err)
-        return cb(err)
-      }
+    setImmediate(
+      this._dialPeer.bind(this), peer, relay, (err, conn) => {
+        if (err) {
+          log.err(err)
+          return cb(err)
+        }
 
-      dstConn.setInnerConn(conn)
-      cb(null, dstConn)
-    })
+        dstConn.setInnerConn(conn)
+        cb(null, dstConn)
+      })
 
     return dstConn
   }
@@ -84,9 +87,10 @@ class Dialer {
           streamHandler = sh
           wCb()
         },
-        (wCb) => streamHandler.write(proto.CircuitRelay.encode({
-          type: proto.CircuitRelay.Type.CAN_HOP
-        }), wCb),
+        (wCb) => streamHandler.write(
+          proto.CircuitRelay.encode({
+            type: proto.CircuitRelay.Type.CAN_HOP
+          }), wCb),
         (wCb) => streamHandler.read(wCb),
         (msg, wCb) => {
           const response = proto.CircuitRelay.decode(msg)

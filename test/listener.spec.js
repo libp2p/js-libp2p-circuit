@@ -30,10 +30,11 @@ describe('listener', function () {
     let conn = null
 
     beforeEach(function (done) {
-      stream = handshake({timeout: 1000 * 60})
+      stream = handshake({ timeout: 1000 * 60 })
       shake = stream.handshake
       conn = new Connection(stream)
-      conn.setPeerInfo(new PeerInfo(PeerId.createFromB58String('QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE')))
+      conn.setPeerInfo(new PeerInfo(PeerId
+        .createFromB58String('QmSswe1dCFRepmhjAMR5VfHeokGLcvVggkuDJm7RMfJSrE')))
 
       waterfall([
         (cb) => PeerId.createFromJSON(nodes.node4, cb),
@@ -193,7 +194,7 @@ describe('listener', function () {
           expect(err).to.be.null()
           encoded.forEach((e) => shake.write(e))
         }),
-        lp.decodeFromReader(shake, {maxLength: this.maxLength}, (err, msg) => {
+        lp.decodeFromReader(shake, { maxLength: this.maxLength }, (err, msg) => {
           expect(err).to.be.null()
           expect(proto.CircuitRelay.decode(msg).type).to.equal(proto.CircuitRelay.Type.STATUS)
           expect(proto.CircuitRelay.decode(msg).code).to.equal(proto.CircuitRelay.Status.MALFORMED_MESSAGE)

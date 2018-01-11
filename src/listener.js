@@ -48,7 +48,9 @@ module.exports = (swarm, options, connHandler) => {
         try {
           request = proto.CircuitRelay.decode(msg)
         } catch (err) {
-          return utils.writeResponse(streamHandler, proto.CircuitRelay.Status.MALFORMED_MESSAGE)
+          return utils.writeResponse(
+            streamHandler,
+            proto.CircuitRelay.Status.MALFORMED_MESSAGE)
         }
 
         switch (request.type) {
@@ -62,7 +64,9 @@ module.exports = (swarm, options, connHandler) => {
           }
 
           default: {
-            return utils.writeResponse(streamHandler, proto.CircuitRelay.Status.INVALID_MSG_TYPE)
+            return utils.writeResponse(
+              streamHandler,
+              proto.CircuitRelay.Status.INVALID_MSG_TYPE)
           }
         }
       })
@@ -128,7 +132,8 @@ module.exports = (swarm, options, connHandler) => {
           // by default we're reachable over any relay
           listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(addr))
         } else {
-          listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(`${addr}/ipfs/${swarm._peerInfo.id.toB58String()}`))
+          const ma = `${addr}/ipfs/${swarm._peerInfo.id.toB58String()}`
+          listenAddrs.push(multiaddr(`/p2p-circuit`).encapsulate(ma))
         }
       } else {
         listenAddrs.push(addr.encapsulate(`/ipfs/${swarm._peerInfo.id.toB58String()}`))
