@@ -36,9 +36,9 @@ module.exports = (swarm, options, connHandler) => {
     callback = callback || (() => {})
 
     swarm.handle(multicodec.relay, (relayProto, conn) => {
-      const streamHandler = new StreamHandler(conn)
+      const sh = new StreamHandler(conn)
 
-      streamHandler.read((err, msg) => {
+      sh.read((err, msg) => {
         if (err) {
           log.err(err)
           return
@@ -49,23 +49,23 @@ module.exports = (swarm, options, connHandler) => {
           request = proto.CircuitRelay.decode(msg)
         } catch (err) {
           return utils.writeResponse(
-            streamHandler,
+            sh,
             proto.CircuitRelay.Status.MALFORMED_MESSAGE)
         }
 
         switch (request.type) {
           case proto.CircuitRelay.Type.CAN_HOP:
           case proto.CircuitRelay.Type.HOP: {
-            return listener.hopHandler.handle(request, streamHandler)
+            return listener.hopHandler.handle(request, sh)
           }
 
           case proto.CircuitRelay.Type.STOP: {
-            return listener.stopHandler.handle(request, streamHandler, connHandler)
+            return listener.stopHandler.handle(request, sh, connHandler)
           }
 
           default: {
             return utils.writeResponse(
-              streamHandler,
+              sh,
               proto.CircuitRelay.Status.INVALID_MSG_TYPE)
           }
         }

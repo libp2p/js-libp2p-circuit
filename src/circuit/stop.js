@@ -22,22 +22,31 @@ class Stop extends EE {
     this.utils = utilsFactory(swarm)
   }
 
-  handle (message, streamHandler, callback) {
+  /**
+   * Handle the incoming STOP message
+   *
+   * @param msg {{}} - the parsed protobuf message
+   * @param sh {StreamHandler} - the stream handler wrapped connection
+   * @param callback {Function} - callback
+   */
+  handle (msg, sh, callback) {
     callback = callback || (() => {})
 
     series([
       (cb) => this.utils.validateAddrs(
-        message,
-        streamHandler,
+        msg,
+        sh,
         proto.CircuitRelay.Type.STOP,
         cb),
       (cb) => this.utils.writeResponse(
-        streamHandler,
+        sh,
         proto.CircuitRelay.Status.Success,
         cb)
     ], (err) => {
       if (err) {
-        callback() // we don't return the error here, since multistream select don't expect one
+        // we don't return the error here,
+        // since multistream select don't expect one
+        callback()
         return log(err)
       }
 

@@ -51,9 +51,8 @@ class StreamHandler {
 
     lp.decodeFromReader(
       this.shake,
-      {
-        maxLength: this.maxLength
-      }, (err, msg) => {
+      { maxLength: this.maxLength },
+      (err, msg) => {
         if (err) {
           log.err(err)
           // this.shake.abort(err)
@@ -115,6 +114,17 @@ class StreamHandler {
     this.stream = null
     this.shake = null
     return rest
+  }
+
+  /**
+   * Close the stream
+   */
+  close () {
+    // close stream
+    pull(
+      pull.empty(),
+      this.rest()
+    )
   }
 }
 

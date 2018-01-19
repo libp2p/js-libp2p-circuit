@@ -77,34 +77,3 @@ exports.stopNodes = function stopNodes (nodes, callback) {
       callback()
     })
 }
-
-function reverse (protocol, conn) {
-  pull(
-    conn,
-    pull.map((data) => {
-      return data.toString().split('').reverse().join('')
-    }),
-    conn
-  )
-}
-
-exports.dialAndReverse = function dialAndRevers (srcNode, dstNode, vals, done) {
-  dstNode.handle('/ipfs/reverse/1.0.0', reverse)
-
-  srcNode.dial(dstNode.peerInfo, '/ipfs/reverse/1.0.0', (err, conn) => {
-    if (err) return done(err)
-
-    pull(
-      pull.values(vals),
-      conn,
-      pull.collect((err, data) => {
-        if (err) return done(err)
-
-        let reversed = data.map((val, i) => {
-          return val.toString()
-        })
-
-        srcNode.hangUp(srcNode.peerInfo, () => done(null, reversed))
-      }))
-  })
-}
