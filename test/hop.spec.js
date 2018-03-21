@@ -1,4 +1,5 @@
 /* eslint-env mocha */
+/* eslint max-nested-callbacks: ["error", 5] */
 'use strict'
 
 const Hop = require('../src/circuit/hop')
@@ -13,7 +14,6 @@ const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const proto = require('../src/protocol')
 const StreamHandler = require('../src/circuit/stream-handler')
-const utilsFactory = require('../src/circuit/utils')
 
 const sinon = require('sinon')
 const chai = require('chai')
@@ -251,7 +251,6 @@ describe('relay', () => {
     let srcShake
     let dstShake
 
-    let utils
     before((done) => {
       srcStream = handshake({ timeout: 1000 * 60 })
       srcShake = srcStream.handshake
@@ -303,7 +302,6 @@ describe('relay', () => {
         relay._dialPeer = sinon.stub()
         relay._dialPeer.callsArgWith(1, null, dstConn)
 
-        utils = utilsFactory(swarm)
         done()
       })
     })
@@ -367,11 +365,7 @@ describe('relay', () => {
           })]),
           lp.encode(),
           pull.collect((err, encoded) => {
-            if (err) {
-              log.err(err)
-              this.shake.abort(err)
-              return cb(err)
-            }
+            expect(err).to.not.exist()
 
             encoded.forEach((e) => dstShake.write(e))
             pull(

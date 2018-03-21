@@ -4,7 +4,6 @@ const TestNode = require('./test-node')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const eachAsync = require('async/each')
-const pull = require('pull-stream')
 
 exports.createNodes = function createNodes (configNodes, callback) {
   const nodes = {}

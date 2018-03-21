@@ -25,9 +25,10 @@ class Stop extends EE {
   /**
    * Handle the incoming STOP message
    *
-   * @param msg {{}} - the parsed protobuf message
-   * @param sh {StreamHandler} - the stream handler wrapped connection
-   * @param callback {Function} - callback
+   * @param {{}} msg  - the parsed protobuf message
+   * @param {StreamHandler} sh  - the stream handler wrapped connection
+   * @param {Function} callback  - callback
+   * @returns {undefined}
    */
   handle (msg, sh, callback) {
     callback = callback || (() => {})

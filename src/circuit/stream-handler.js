@@ -118,6 +118,8 @@ class StreamHandler {
 
   /**
    * Close the stream
+   *
+   * @returns {undefined}
    */
   close () {
     // close stream
