@@ -192,7 +192,7 @@ class Hop extends EE {
                     srcConn
                   )
 
-                  cb(new Error(`Unable to create circuit!`))
+                  return cb(new Error(`Unable to create circuit!`))
                 }
 
                 // circuit the src and dst streams
