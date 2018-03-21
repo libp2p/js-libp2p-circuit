@@ -252,7 +252,7 @@ describe('relay', () => {
     let dstShake
 
     let utils
-    beforeEach((done) => {
+    before((done) => {
       srcStream = handshake({ timeout: 1000 * 60 })
       srcShake = srcStream.handshake
       srcConn = new Connection(srcStream)
@@ -308,7 +308,7 @@ describe('relay', () => {
       })
     })
 
-    afterEach(() => relay._dialPeer.reset())
+    after(() => relay._dialPeer.reset())
 
     describe('should correctly dial destination node', () => {
       let msg = {
@@ -323,13 +323,12 @@ describe('relay', () => {
         }
       }
 
-      beforeEach(() => {
+      before(() => {
         relay._circuit(
           srcConn,
           msg,
-          (err, conn) => {
+          (err) => {
             expect(err).to.not.exist()
-            expect(conn).to.exist()
           })
       })
 
@@ -361,30 +360,39 @@ describe('relay', () => {
       })
 
       it('should create circuit', (done) => {
-        utils.writeResponse(
-          new StreamHandler(dstConn),
-          proto.CircuitRelay.Status.Success)
+        pull(
+          pull.values([proto.CircuitRelay.encode({
+            type: proto.CircuitRelay.Type.STATUS,
+            code: proto.CircuitRelay.Status.SUCCESS
+          })]),
+          lp.encode(),
+          pull.collect((err, encoded) => {
+            if (err) {
+              log.err(err)
+              this.shake.abort(err)
+              return cb(err)
+            }
 
-        relay.on('circuit:success', () => {
-          pull(
-            pull.values([Buffer.from('hello')]),
-            lp.encode(),
-            pull.collect((err, encoded) => {
-              expect(err).to.not.exist()
+            encoded.forEach((e) => dstShake.write(e))
+            pull(
+              pull.values([Buffer.from('hello')]),
+              lp.encode(),
+              pull.collect((err, encoded) => {
+                expect(err).to.not.exist()
 
-              encoded.forEach((e) => srcShake.write(e))
-              lp.decodeFromReader(
-                dstShake,
-                (err, msg) => {
-                  expect(err).to.not.exist()
-                  expect(msg.toString()).to.equal('hello')
-                  done()
-                })
-            })
-          )
-        })
+                encoded.forEach((e) => srcShake.write(e))
+                lp.decodeFromReader(
+                  dstShake,
+                  (err, _msg) => {
+                    expect(err).to.not.exist()
+                    expect(_msg.toString()).to.equal('hello')
 
-        relay.on('circuit:error', (err) => done(err))
+                    done()
+                  })
+              })
+            )
+          })
+        )
       })
     })
   })

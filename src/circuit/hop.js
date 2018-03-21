@@ -135,80 +135,78 @@ class Hop extends EE {
    * @private
    */
   _circuit (conn, message, cb) {
-    this._dialPeer(
-      message.dstPeer,
-      (err, dstConn) => {
-        const srcSH = new StreamHandler(conn)
-        if (err) {
-          this.utils.writeResponse(
-            srcSH,
-            proto.CircuitRelay.Status.HOP_CANT_DIAL_DST)
-
-          srcSH.close()
-
-          log.err(err)
-          return cb(err)
-        }
-
-        return this.utils.writeResponse(
+    this._dialPeer(message.dstPeer, (err, dstConn) => {
+      const srcSH = new StreamHandler(conn)
+      if (err) {
+        this.utils.writeResponse(
           srcSH,
-          proto.CircuitRelay.Status.SUCCESS,
-          (err) => {
-            if (err) {
-              log.err(err)
-              return cb(err)
-            }
+          proto.CircuitRelay.Status.HOP_CANT_DIAL_DST)
+        srcSH.close()
+        log.err(err)
+        return cb(err)
+      }
 
-            const dstSH = new StreamHandler(dstConn)
-            const stopMsg = Object.assign({}, message, {
-              type: proto.CircuitRelay.Type.STOP // change the message type
-            })
-            dstSH.write(
-              proto.CircuitRelay.encode(stopMsg),
-              (err) => {
+      // 1) write the SUCCESS to the src node
+      return this.utils.writeResponse(
+        srcSH,
+        proto.CircuitRelay.Status.SUCCESS,
+        (err) => {
+          if (err) {
+            log.err(err)
+            return cb(err)
+          }
+
+          const dstSH = new StreamHandler(dstConn)
+          const stopMsg = Object.assign({}, message, {
+            type: proto.CircuitRelay.Type.STOP // change the message type
+          })
+          // 2) write circuit request to the STOP node
+          dstSH.write(proto.CircuitRelay.encode(stopMsg),
+            (err) => {
+              if (err) {
+                const errSH = new StreamHandler(conn)
+                this.utils.writeResponse(
+                  errSH,
+                  proto.CircuitRelay.Status.HOP_CANT_OPEN_DST_STREAM)
+
+                // close stream
+                errSH.close()
+
+                log.err(err)
+                return cb(err)
+              }
+
+              // read response from STOP
+              dstSH.read((err, msg) => {
                 if (err) {
-                  const errSH = new StreamHandler(conn)
-                  this.utils.writeResponse(
-                    errSH,
-                    proto.CircuitRelay.Status.HOP_CANT_OPEN_DST_STREAM)
-
-                  // close stream
-                  errSH.close()
-
                   log.err(err)
                   return cb(err)
                 }
 
-                dstSH.read((err, msg) => {
-                  if (err) {
-                    log.err(err)
-                    return cb(err)
-                  }
+                const message = proto.CircuitRelay.decode(msg)
+                const srcConn = srcSH.rest()
+                if (message.code !== proto.CircuitRelay.Status.SUCCESS) {
+                  // close/end the source stream if there was an error
+                  pull(
+                    pull.empty(),
+                    srcConn
+                  )
 
-                  const message = proto.CircuitRelay.decode(msg)
-                  const srcConn = srcSH.rest()
-                  if (message.code === proto.CircuitRelay.Status.SUCCESS) {
-                    // circuit the src and dst streams
-                    pull(
-                      srcConn,
-                      dstSH.rest(),
-                      srcConn
-                    )
+                  cb(new Error(`Unable to create circuit!`))
+                }
 
-                    cb()
-                  } else {
-                    // close/end the source stream if there was an error
-                    pull(
-                      pull.empty(),
-                      srcConn
-                    )
+                // circuit the src and dst streams
+                pull(
+                  srcConn,
+                  dstSH.rest(),
+                  srcConn
+                )
 
-                    cb(new Error(`Unable to create circuit!`))
-                  }
-                })
+                cb()
               })
-          })
-      })
+            })
+        })
+    })
   }
 
   /**

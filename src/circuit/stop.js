@@ -50,9 +50,9 @@ class Stop extends EE {
         return log(err)
       }
 
-      const peerInfo = new PeerInfo(peerIdFromId(message.srcPeer.id))
-      message.srcPeer.addrs.forEach((addr) => peerInfo.multiaddrs.add(addr))
-      const newConn = new Connection(streamHandler.rest())
+      const peerInfo = new PeerInfo(peerIdFromId(msg.srcPeer.id))
+      msg.srcPeer.addrs.forEach((addr) => peerInfo.multiaddrs.add(addr))
+      const newConn = new Connection(sh.rest())
       newConn.setPeerInfo(peerInfo)
       setImmediate(() => this.emit('connection', newConn))
       callback(newConn)
