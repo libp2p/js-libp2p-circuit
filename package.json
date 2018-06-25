@@ -2,6 +2,7 @@
   "name": "libp2p-circuit",
   "version": "0.2.0",
   "description": "JavaScript implementation of circuit/switch relaying",
+  "leadMaintainer": "Jacob Heun <jacobheun@gmail.com>",
   "main": "src/index.js",
   "scripts": {
     "lint": "aegir lint",
@@ -26,7 +27,6 @@
   "keywords": [
     "IPFS"
   ],
-  "author": "Dmitriy Ryajov <dryajov@gmail.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/libp2p/js-libp2p-circuit/issues"
