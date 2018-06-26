@@ -16,7 +16,7 @@
     "coverage": "aegir coverage",
     "coverage-publish": "aegir coverage --provider coveralls"
   },
-  "pre-commit": [
+  "pre-push": [
     "lint",
     "test"
   ],
@@ -36,7 +36,6 @@
     "aegir": "^13.0.6",
     "chai": "^4.1.2",
     "dirty-chai": "^2.0.1",
-    "pre-commit": "^1.2.2",
     "sinon": "^4.5.0"
   },
   "contributors": [
