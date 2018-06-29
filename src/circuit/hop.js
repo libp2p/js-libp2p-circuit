@@ -49,15 +49,15 @@ class Hop extends EE {
     if (!this.config.enabled) {
       this.utils.writeResponse(
         sh,
-        proto.Status.HOP_CANT_SPEAK_RELAY)
+        proto.CircuitRelay.Status.HOP_CANT_SPEAK_RELAY)
       return sh.close()
     }
 
     // check if message is `CAN_HOP`
-    if (message.type === proto.Type.CAN_HOP) {
+    if (message.type === proto.CircuitRelay.Type.CAN_HOP) {
       this.utils.writeResponse(
         sh,
-        proto.Status.SUCCESS)
+        proto.CircuitRelay.Status.SUCCESS)
       return sh.close()
     }
 
@@ -66,7 +66,7 @@ class Hop extends EE {
     if (srcPeerId.toB58String() === this.peerInfo.id.toB58String()) {
       this.utils.writeResponse(
         sh,
-        proto.Status.HOP_CANT_RELAY_TO_SELF)
+        proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
       return sh.close()
     }
 
@@ -168,7 +168,11 @@ class Hop extends EE {
             proto.Status.HOP_CANT_OPEN_DST_STREAM)
 
           log.err(err)
-          return callback(err)
+          setImmediate(() => this.emit('circuit:error', err))
+          this.utils.writeResponse(
+            sh,
+            proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
+          return sh.close()
         }
 
         // read response from STOP
