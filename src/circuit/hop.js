@@ -15,8 +15,8 @@ const waterfall = require('async/waterfall')
 
 const multicodec = require('./../multicodec')
 
-const log = debug('libp2p:swarm:circuit:relay')
-log.err = debug('libp2p:swarm:circuit:error:relay')
+const log = debug('libp2p:circuit:relay')
+log.err = debug('libp2p:circuit:error:relay')
 
 class Hop extends EE {
   /**
@@ -49,24 +49,24 @@ class Hop extends EE {
     if (!this.config.enabled) {
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.HOP_CANT_SPEAK_RELAY)
+        proto.Status.HOP_CANT_SPEAK_RELAY)
       return sh.close()
     }
 
     // check if message is `CAN_HOP`
-    if (message.type === proto.CircuitRelay.Type.CAN_HOP) {
+    if (message.type === proto.Type.CAN_HOP) {
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.SUCCESS)
+        proto.Status.SUCCESS)
       return sh.close()
     }
 
     // This is a relay request - validate and create a circuit
-    const srcPeerId = PeerId.createFromBytes(message.dstPeer.id)
-    if (srcPeerId.toB58String() === this.peerInfo.id.toB58String()) {
+    const srcPeerId = PeerId.createFromBytes(message.srcPeer.id).toB58String()
+    if (srcPeerId === this.peerInfo.id.toB58String()) {
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
+        proto.Status.HOP_CANT_RELAY_TO_SELF)
       return sh.close()
     }
 
@@ -77,8 +77,9 @@ class Hop extends EE {
       message.dstPeer.addrs.push(addr)
     }
 
-    const noPeer = (err) => {
-      log.err(err)
+    log(`trying to establish a circuit: ${srcPeerId} <-> ${dstPeerId}`)
+    const noPeer = () => {
+      // log.err(err)
       this.utils.writeResponse(
         sh,
         proto.Status.HOP_NO_CONN_TO_DST)
@@ -90,7 +91,7 @@ class Hop extends EE {
       try {
         dstPeer = this.swarm._peerBook.get(dstPeerId)
         if (!dstPeer.isConnected() && !this.active) {
-          const err = new Error('No Connection to peer')
+          const err = new Error(`No Connection to peer ${dstPeerId}`)
           noPeer(err)
           return cb(err)
         }
@@ -106,11 +107,12 @@ class Hop extends EE {
     series([
       (cb) => this.utils.validateAddrs(message, sh, proto.Type.HOP, cb),
       (cb) => isConnected(cb),
-      (cb) => this._circuit(sh.rest(), message, cb)
+      (cb) => this._circuit(sh, message, cb)
     ], (err) => {
       if (err) {
         log.err(err)
         setImmediate(() => this.emit('circuit:error', err))
+        return sh.close()
       }
       setImmediate(() => this.emit('circuit:success'))
     })
@@ -168,11 +170,7 @@ class Hop extends EE {
             proto.Status.HOP_CANT_OPEN_DST_STREAM)
 
           log.err(err)
-          setImmediate(() => this.emit('circuit:error', err))
-          this.utils.writeResponse(
-            sh,
-            proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
-          return sh.close()
+          return callback(err)
         }
 
         // read response from STOP
@@ -203,7 +201,7 @@ class Hop extends EE {
    */
   _circuit (srcConn, message, callback) {
     let dstSh = null
-    const srcSh = new StreamHandler(srcConn)
+    const srcSh = srcConn
     waterfall([
       (cb) => this._connectToStop(message.dstPeer, srcSh, cb),
       (_dstConn, cb) => {
@@ -225,8 +223,17 @@ class Hop extends EE {
 
       const src = srcSh.rest()
       const dst = dstSh.rest()
+
+      const srcIdStr = PeerId.createFromBytes(message.srcPeer.id).toB58String()
+      const dstIdStr = PeerId.createFromBytes(message.dstPeer.id).toB58String()
+
       // circuit the src and dst streams
-      pull(src, dst, src)
+      pull(
+        src,
+        dst,
+        src
+      )
+      log(`circuit ${srcIdStr} <-> ${dstIdStr} established`)
       callback()
     })
   }
