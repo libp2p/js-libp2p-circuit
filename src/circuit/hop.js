@@ -10,6 +10,7 @@ const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
 const proto = require('../protocol')
 const multiaddr = require('multiaddr')
+const series = require('async/series')
 
 const multicodec = require('./../multicodec')
 
@@ -32,7 +33,7 @@ class Hop extends EE {
     this.swarm = swarm
     this.peerInfo = this.swarm._peerInfo
     this.utils = utilsFactory(swarm)
-    this.config = options || {active: false, enabled: false}
+    this.config = options || { active: false, enabled: false }
     this.active = this.config.active
   }
 
@@ -75,47 +76,47 @@ class Hop extends EE {
       message.dstPeer.addrs.push(addr)
     }
 
-    this.utils.validateAddrs(
-      message,
-      sh,
-      proto.CircuitRelay.Type.HOP,
-      (err) => {
-        if (err) {
-          return log(err)
-        }
+    const noPeer = (err) => {
+      log.err(err)
+      setImmediate(() => this.emit('circuit:error', err))
+      this.utils.writeResponse(
+        sh,
+        proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
+      return sh.close()
+    }
 
-        const noPeer = (err) => {
-          log.err(err)
-          setImmediate(() => this.emit('circuit:error', err))
-          this.utils.writeResponse(
-            sh,
-            proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
-          return sh.close()
+    const isConnected = (cb) => {
+      let dstPeer
+      try {
+        dstPeer = this.swarm._peerBook.get(dstPeerId)
+        if (!dstPeer.isConnected() && !this.active) {
+          const err = new Error('No Connection to peer')
+          noPeer(err)
+          return cb(err)
         }
-
-        let dstPeer
-        try {
-          dstPeer = this.swarm._peerBook.get(dstPeerId)
-          if (!dstPeer.isConnected() && !this.active) {
-            return noPeer(Error('No Connection to peer'))
-          }
-        } catch (err) {
-          if (!this.active) {
-            return noPeer(err)
-          }
+      } catch (err) {
+        if (!this.active) {
+          noPeer(err)
+          return cb(err)
         }
+      }
+      cb()
+    }
 
-        return this._circuit(
-          sh.rest(),
-          message,
-          (err) => {
-            if (err) {
-              log.err(err)
-              setImmediate(() => this.emit('circuit:error', err))
-            }
-            setImmediate(() => this.emit('circuit:success'))
-          })
-      })
+    series([
+      (cb) => this.utils.validateAddrs(message,
+        sh,
+        proto.CircuitRelay.Type.HOP,
+        cb),
+      (cb) => isConnected(cb),
+      (cb) => this._circuit(sh.rest(), message, cb)
+    ], (err) => {
+      if (err) {
+        log.err(err)
+        setImmediate(() => this.emit('circuit:error', err))
+      }
+      setImmediate(() => this.emit('circuit:success'))
+    })
   }
 
   /**
