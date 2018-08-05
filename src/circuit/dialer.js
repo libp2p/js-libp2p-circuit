@@ -237,7 +237,7 @@ class Dialer {
           return callback(new Error(`Got ${message.code} error code trying to dial over relay`))
         }
 
-        callback(null, conn)
+        callback(null, new Connection(sh.rest()))
       })
     })
   }
