@@ -8,9 +8,10 @@ const EE = require('events').EventEmitter
 const once = require('once')
 const utilsFactory = require('./utils')
 const StreamHandler = require('./stream-handler')
-const proto = require('../protocol')
+const proto = require('../protocol').CircuitRelay
 const multiaddr = require('multiaddr')
 const series = require('async/series')
+const waterfall = require('async/waterfall')
 
 const multicodec = require('./../multicodec')
 
@@ -48,15 +49,15 @@ class Hop extends EE {
     if (!this.config.enabled) {
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.HOP_CANT_SPEAK_RELAY)
+        proto.Status.HOP_CANT_SPEAK_RELAY)
       return sh.close()
     }
 
     // check if message is `CAN_HOP`
-    if (message.type === proto.CircuitRelay.Type.CAN_HOP) {
+    if (message.type === proto.Type.CAN_HOP) {
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.SUCCESS)
+        proto.Status.SUCCESS)
       return sh.close()
     }
 
@@ -65,7 +66,7 @@ class Hop extends EE {
     if (srcPeerId.toB58String() === this.peerInfo.id.toB58String()) {
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.HOP_CANT_RELAY_TO_SELF)
+        proto.Status.HOP_CANT_RELAY_TO_SELF)
       return sh.close()
     }
 
@@ -81,7 +82,7 @@ class Hop extends EE {
       setImmediate(() => this.emit('circuit:error', err))
       this.utils.writeResponse(
         sh,
-        proto.CircuitRelay.Status.HOP_NO_CONN_TO_DST)
+        proto.Status.HOP_NO_CONN_TO_DST)
       return sh.close()
     }
 
@@ -104,10 +105,7 @@ class Hop extends EE {
     }
 
     series([
-      (cb) => this.utils.validateAddrs(message,
-        sh,
-        proto.CircuitRelay.Type.HOP,
-        cb),
+      (cb) => this.utils.validateAddrs(message, sh, proto.Type.HOP, cb),
       (cb) => isConnected(cb),
       (cb) => this._circuit(sh.rest(), message, cb)
     ], (err) => {
@@ -120,86 +118,113 @@ class Hop extends EE {
   }
 
   /**
-   * Attempt to make a circuit from A <-> R <-> B where R is this relay
+   * Connect to STOP
    *
-   * @param {Connection} conn - the source connection
-   * @param {CircuitRelay} message - the message with the src and dst entries
-   * @param {Function} cb - callback to signal success or failure
-   * @returns {void}
-   * @private
+   * @param {PeerInfo} peer
+   * @param {StreamHandler} srcSh
+   * @param {function} callback
+   * @returns {function}
    */
-  _circuit (conn, message, cb) {
-    this._dialPeer(message.dstPeer, (err, dstConn) => {
-      const srcSH = new StreamHandler(conn)
+  _connectToStop (peer, srcSh, callback) {
+    this._dialPeer(peer, (err, dstConn) => {
       if (err) {
         this.utils.writeResponse(
-          srcSH,
-          proto.CircuitRelay.Status.HOP_CANT_DIAL_DST)
-        srcSH.close()
+          srcSh,
+          proto.Status.HOP_CANT_DIAL_DST)
         log.err(err)
-        return cb(err)
+        return callback(err)
       }
 
-      // 1) write the SUCCESS to the src node
       return this.utils.writeResponse(
-        srcSH,
-        proto.CircuitRelay.Status.SUCCESS,
+        srcSh,
+        proto.Status.SUCCESS,
         (err) => {
           if (err) {
             log.err(err)
-            return cb(err)
+            return callback(err)
+          }
+          return callback(null, dstConn)
+        })
+    })
+  }
+
+  /**
+   * Negotiate STOP
+   *
+   * @param {StreamHandler} dstSh
+   * @param {StreamHandler} srcSh
+   * @param {CircuitRelay} message
+   * @param {function} callback
+   * @returns {function}
+   */
+  _negotiateStop (dstSh, srcSh, message, callback) {
+    const stopMsg = Object.assign({}, message, {
+      type: proto.Type.STOP // change the message type
+    })
+    dstSh.write(proto.encode(stopMsg),
+      (err) => {
+        if (err) {
+          this.utils.writeResponse(
+            srcSh,
+            proto.Status.HOP_CANT_OPEN_DST_STREAM)
+
+          log.err(err)
+          return callback(err)
+        }
+
+        // read response from STOP
+        dstSh.read((err, msg) => {
+          if (err) {
+            log.err(err)
+            return callback(err)
           }
 
-          const dstSH = new StreamHandler(dstConn)
-          const stopMsg = Object.assign({}, message, {
-            type: proto.CircuitRelay.Type.STOP // change the message type
-          })
-          // 2) write circuit request to the STOP node
-          dstSH.write(proto.CircuitRelay.encode(stopMsg),
-            (err) => {
-              if (err) {
-                const errSH = new StreamHandler(conn)
-                this.utils.writeResponse(
-                  errSH,
-                  proto.CircuitRelay.Status.HOP_CANT_OPEN_DST_STREAM)
+          const message = proto.decode(msg)
+          if (message.code !== proto.Status.SUCCESS) {
+            return callback(new Error(`Unable to create circuit!`))
+          }
 
-                // close stream
-                errSH.close()
-
-                log.err(err)
-                return cb(err)
-              }
-
-              // read response from STOP
-              dstSH.read((err, msg) => {
-                if (err) {
-                  log.err(err)
-                  return cb(err)
-                }
-
-                const message = proto.CircuitRelay.decode(msg)
-                const srcConn = srcSH.rest()
-                if (message.code !== proto.CircuitRelay.Status.SUCCESS) {
-                  // close/end the source stream if there was an error
-                  pull(
-                    pull.empty(),
-                    srcConn
-                  )
-
-                  return cb(new Error(`Unable to create circuit!`))
-                }
-
-                // circuit the src and dst streams
-                pull(
-                  srcConn,
-                  dstSH.rest(),
-                  srcConn
-                )
-
-                cb()
-              })
-            })
+          return callback(null, msg)
         })
+      })
+  }
+
+  /**
+   * Attempt to make a circuit from A <-> R <-> B where R is this relay
+   *
+   * @param {Connection} srcConn - the source connection
+   * @param {CircuitRelay} message - the message with the src and dst entries
+   * @param {Function} callback - callback to signal success or failure
+   * @returns {void}
+   * @private
+   */
+  _circuit (srcConn, message, callback) {
+    let dstSh = null
+    const srcSh = new StreamHandler(srcConn)
+    waterfall([
+      (cb) => this._connectToStop(message.dstPeer, srcSh, cb),
+      (_dstConn, cb) => {
+        dstSh = new StreamHandler(_dstConn)
+        this._negotiateStop(dstSh, srcConn, message, cb)
+      }
+    ], (err) => {
+      if (err) {
+        // close/end the source stream if there was an error
+        if (srcSh) {
+          srcSh.close()
+        }
+
+        if (dstSh) {
+          dstSh.close()
+        }
+        return callback(err)
+      }
+
+      const src = srcSh.rest()
+      const dst = dstSh.rest()
+      // circuit the src and dst streams
+      pull(src, dst, src)
+      callback()
     })
   }
 
@@ -214,17 +239,14 @@ class Hop extends EE {
   _dialPeer (dstPeer, callback) {
     const peerInfo = new PeerInfo(PeerId.createFromBytes(dstPeer.id))
     dstPeer.addrs.forEach((a) => peerInfo.multiaddrs.add(a))
-    this.swarm.dial(
-      peerInfo,
-      multicodec.relay,
-      once((err, conn) => {
-        if (err) {
-          log.err(err)
-          return callback(err)
-        }
+    this.swarm.dial(peerInfo, multicodec.relay, once((err, conn) => {
+      if (err) {
+        log.err(err)
+        return callback(err)
+      }
 
-        callback(null, conn)
-      }))
+      callback(null, conn)
+    }))
   }
 }
 
