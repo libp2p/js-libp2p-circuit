@@ -79,7 +79,6 @@ class Hop extends EE {
 
     const noPeer = (err) => {
       log.err(err)
-      setImmediate(() => this.emit('circuit:error', err))
       this.utils.writeResponse(
         sh,
         proto.Status.HOP_NO_CONN_TO_DST)
