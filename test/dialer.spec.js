@@ -23,7 +23,7 @@ const dirtyChai = require('dirty-chai')
 const expect = chai.expect
 chai.use(dirtyChai)
 
-describe.only(`dialer tests`, function () {
+describe(`dialer tests`, function () {
   describe(`.dial`, function () {
     const dialer = sinon.createStubInstance(Dialer)
 
