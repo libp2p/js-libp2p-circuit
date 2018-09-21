@@ -14,7 +14,8 @@
     "release-minor": "aegir release --type minor --target node --target browser",
     "release-major": "aegir release --type major --target node --target browser",
     "coverage": "aegir coverage",
-    "coverage-publish": "aegir coverage --provider coveralls"
+    "coverage-publish": "aegir coverage --provider coveralls",
+    "postinstall": "patch-package"
   },
   "pre-push": [
     "lint",
@@ -59,6 +60,7 @@
     "mafmt": "^6.0.0",
     "multiaddr": "^5.0.0",
     "multistream-select": "^0.14.1",
+    "patch-package": "^5.1.1",
     "peer-id": "^0.11.0",
     "peer-info": "^0.14.1",
     "protons": "^1.0.1",

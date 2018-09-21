@@ -111,8 +111,8 @@ class Hop extends EE {
     ], (err) => {
       if (err) {
         log.err(err)
-        setImmediate(() => this.emit('circuit:error', err))
-        return sh.close()
+        sh.close()
+        return setImmediate(() => this.emit('circuit:error', err))
       }
       setImmediate(() => this.emit('circuit:success'))
     })
