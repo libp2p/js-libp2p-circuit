@@ -62,7 +62,7 @@ class Hop extends EE {
     }
 
     // This is a relay request - validate and create a circuit
-    const srcPeerId = PeerId.createFromBytes(message.srcPeer.id).toB58String()
+    const srcPeerId = PeerId.createFromBytes(message.dstPeer.id).toB58String()
     if (srcPeerId === this.peerInfo.id.toB58String()) {
       this.utils.writeResponse(
         sh,
@@ -168,7 +168,6 @@ class Hop extends EE {
           this.utils.writeResponse(
             srcSh,
             proto.Status.HOP_CANT_OPEN_DST_STREAM)
-
           log.err(err)
           return callback(err)
         }
@@ -193,20 +192,19 @@ class Hop extends EE {
   /**
    * Attempt to make a circuit from A <-> R <-> B where R is this relay
    *
-   * @param {Connection} srcConn - the source connection
+   * @param {StreamHandler} srcSh - the source stream handler
    * @param {CircuitRelay} message - the message with the src and dst entries
    * @param {Function} callback - callback to signal success or failure
    * @returns {void}
    * @private
    */
-  _circuit (srcConn, message, callback) {
+  _circuit (srcSh, message, callback) {
     let dstSh = null
-    const srcSh = srcConn
     waterfall([
       (cb) => this._connectToStop(message.dstPeer, srcSh, cb),
       (_dstConn, cb) => {
         dstSh = new StreamHandler(_dstConn)
-        this._negotiateStop(dstSh, srcConn, message, cb)
+        this._negotiateStop(dstSh, srcSh, message, cb)
       }
     ], (err) => {
       if (err) {

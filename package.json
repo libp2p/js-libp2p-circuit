@@ -14,8 +14,7 @@
     "release-minor": "aegir release --type minor --target node --target browser",
     "release-major": "aegir release --type major --target node --target browser",
     "coverage": "aegir coverage",
-    "coverage-publish": "aegir coverage --provider coveralls",
-    "postinstall": "patch-package"
+    "coverage-publish": "aegir coverage --provider coveralls"
   },
   "pre-push": [
     "lint",
@@ -43,26 +42,25 @@
     "Victor Bjelkholm <victorbjelkholm@gmail.com>"
   ],
   "devDependencies": {
-    "aegir": "^13.0.6",
+    "aegir": "^15.2.0",
     "assert": "^1.4.1",
     "chai": "^4.1.2",
     "dirty-chai": "^2.0.1",
-    "libp2p": "^0.23.0",
-    "libp2p-secio": "^0.10.0",
-    "pull-protocol-buffers": "^0.1.2",
-    "sinon": "^4.5.0"
+    "libp2p": "~0.23.0",
+    "libp2p-secio": "~0.10.0",
+    "pull-protocol-buffers": "~0.1.2",
+    "sinon": "^6.3.4"
   },
   "dependencies": {
     "async": "^2.6.0",
-    "debug": "^3.1.0",
-    "defaults-deep": "^0.2.4",
-    "interface-connection": "^0.3.2",
+    "debug": "^4.0.1",
+    "defaults-deep": "~0.2.4",
+    "interface-connection": "~0.3.2",
     "mafmt": "^6.0.0",
     "multiaddr": "^5.0.0",
-    "multistream-select": "^0.14.1",
-    "patch-package": "^5.1.1",
-    "peer-id": "^0.11.0",
-    "peer-info": "^0.14.1",
+    "multistream-select": "~0.14.1",
+    "peer-id": "~0.11.0",
+    "peer-info": "~0.14.1",
     "protons": "^1.0.1",
     "pull-abortable": "^4.1.1",
     "pull-handshake": "^1.1.4",

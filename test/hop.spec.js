@@ -323,7 +323,7 @@ describe('relay', () => {
 
       before(() => {
         relay._circuit(
-          srcConn,
+          new StreamHandler(srcConn),
           msg,
           (err) => {
             expect(err).to.not.exist()
