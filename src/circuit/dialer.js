@@ -209,6 +209,12 @@ class Dialer {
       waterfall([
         (cb) => {
           log(`negotiating relay for peer ${dstMa.getPeerId()}`)
+          let dstPeerId
+          try {
+            dstPeerId = PeerId.createFromB58String(dstMa.getPeerId()).id
+          } catch (err) {
+            return cb(err)
+          }
           sh.write(
             proto.CircuitRelay.encode({
               type: proto.CircuitRelay.Type.HOP,
@@ -217,7 +223,7 @@ class Dialer {
                 addrs: srcMas.map((addr) => addr.buffer)
               },
               dstPeer: {
-                id: PeerId.createFromB58String(dstMa.getPeerId()).id,
+                id: dstPeerId,
                 addrs: [dstMa.buffer]
               }
             }), cb)
