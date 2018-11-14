@@ -92,7 +92,7 @@ class Dialer {
    *
    * @param {PeerInfo} peer
    * @param {Function} callback
-   * @returns {*}
+   * @returns {void}
    */
   canHop (peer, callback) {
     callback = once(callback || (() => { }))
@@ -253,7 +253,7 @@ class Dialer {
    *
    * @param {PeerInfo} peer - the PeerInfo of the relay peer
    * @param {Function} cb - a callback with the connection to the relay peer
-   * @returns {Function|void}
+   * @returns {void}
    * @private
    */
   _dialRelay (peer, cb) {
