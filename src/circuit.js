@@ -44,9 +44,11 @@ class Circuit {
     this.dialer = new CircuitDialer(swarm, options)
 
     this.swarm.on('peer-mux-established', (peerInfo) => {
+      this.dialer.checkingPeers.add(peerInfo.id.toB58String())
       this.dialer.canHop(peerInfo)
     })
     this.swarm.on('peer-mux-closed', (peerInfo) => {
+      this.dialer.checkingPeers.delete(peerInfo.id.toB58String())
       this.dialer.relayPeers.delete(peerInfo.id.toB58String())
     })
   }

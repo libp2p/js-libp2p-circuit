@@ -88,6 +88,7 @@ describe(`dialer tests`, function () {
 
       dialer.relayPeers = new Map()
       dialer.relayConns = new Map()
+      dialer.checkingPeers = new Set()
       dialer.utils = utilsFactory({})
       dialer.canHop.callThrough()
       dialer._dialRelayHelper.callThrough()

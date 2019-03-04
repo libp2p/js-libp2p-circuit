@@ -3,6 +3,7 @@
 const once = require('once')
 const PeerId = require('peer-id')
 const waterfall = require('async/waterfall')
+const nextTick = require('async/nextTick')
 const multiaddr = require('multiaddr')
 
 const Connection = require('interface-connection').Connection
@@ -28,6 +29,7 @@ class Dialer {
   constructor (swarm, options) {
     this.swarm = swarm
     this.relayPeers = new Map()
+    this.checkingPeers = new Set()
     this.relayConns = new Map()
     this.options = options
     this.utils = utilsFactory(swarm)
@@ -69,7 +71,7 @@ class Dialer {
     const peer = multiaddr(addr[1] || addr[0])
 
     const dstConn = new Connection()
-    setImmediate(
+    nextTick(
       this._dialPeer.bind(this),
       peer,
       relay,
@@ -96,9 +98,14 @@ class Dialer {
   canHop (peer, callback) {
     callback = once(callback || (() => { }))
 
+    const didCheck = (err) => {
+      this.checkingPeers.delete(peer.id.toB58String())
+      callback(err)
+    }
+
     this._dialRelayHelper(peer, (err, conn) => {
       if (err) {
-        return callback(err)
+        return didCheck(err)
       }
 
       const sh = new StreamHandler(conn)
@@ -109,20 +116,20 @@ class Dialer {
         (cb) => sh.read(cb)
       ], (err, msg) => {
         if (err) {
-          return callback(err)
+          return didCheck(err)
         }
         const response = proto.CircuitRelay.decode(msg)
 
         if (response.code !== proto.CircuitRelay.Status.SUCCESS) {
           const err = new Error(`HOP not supported, skipping - ${this.utils.getB58String(peer)}`)
           log(err)
-          return callback(err)
+          return didCheck(err)
         }
 
         log(`HOP supported adding as relay - ${this.utils.getB58String(peer)}`)
         this.relayPeers.set(this.utils.getB58String(peer), peer)
         sh.close()
-        callback()
+        didCheck()
       })
     })
   }
@@ -150,6 +157,11 @@ class Dialer {
     // if no relay provided, dial on all available relays until one succeeds
     if (!relay) {
       const relays = Array.from(this.relayPeers.values())
+      // Keep retrying if we're waiting to check peers
+      if (relays.length < 1 && this.checkingPeers.size > 0) {
+        nextTick(this._dialPeer.bind(this), dstMa, relay, cb)
+        return
+      }
       let next = (nextRelay) => {
         if (!nextRelay) {
           let err = `no relay peers were found or all relays failed to dial`
