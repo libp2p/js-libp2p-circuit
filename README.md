@@ -1,3 +1,6 @@
+⛔️ DEPRECATED: libp2p-circuit is now included in [js-libp2p](https://github.com/libp2p/js-libp2p)
+======
+
 # js-libp2p-circuit
 
 
